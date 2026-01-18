@@ -8,6 +8,11 @@ from typing import Optional
 from airobo_trainer.models.item_model import ItemModel
 from airobo_trainer.views.main_view import MainView
 from airobo_trainer.views.bci_config_view import BCIConfigView
+from airobo_trainer.views.experiment_views import (
+    TextCommandsExperimentView,
+    AvatarExperimentView,
+    VideoExperimentView
+)
 
 
 class MainController:
@@ -29,6 +34,7 @@ class MainController:
         self.model = model if model is not None else ItemModel()
         self.main_view = view if view is not None else MainView()
         self.bci_config_view = BCIConfigView()
+        self.current_experiment_view = None  # Track current experiment view
         self.current_view = self.main_view  # Track which view is currently active
 
         # Connect view signals to controller methods
@@ -40,6 +46,7 @@ class MainController:
     def _connect_signals(self) -> None:
         """Connect view signals to controller handler methods."""
         self.main_view.configure_bci_requested.connect(self._show_bci_config)
+        self.main_view.experiment_selected.connect(self._show_experiment)
         self.bci_config_view.back_requested.connect(self._show_main_view)
 
     def _update_view(self) -> None:
@@ -50,13 +57,15 @@ class MainController:
 
     def _update_status(self) -> None:
         """Update the status label with current item count."""
-        count = self.model.get_count()
-        if count == 0:
-            self.current_view.set_status("No items")
-        elif count == 1:
-            self.current_view.set_status("1 item")
-        else:
-            self.current_view.set_status(f"{count} items")
+        # Only update status for views that have status functionality
+        if hasattr(self.current_view, 'set_status'):
+            count = self.model.get_count()
+            if count == 0:
+                self.current_view.set_status("No items")
+            elif count == 1:
+                self.current_view.set_status("1 item")
+            else:
+                self.current_view.set_status(f"{count} items")
 
     def _show_bci_config(self) -> None:
         """Show the BCI configuration view."""
@@ -66,10 +75,35 @@ class MainController:
 
     def _show_main_view(self) -> None:
         """Show the main view."""
+        # Hide any current views
         self.bci_config_view.hide()
+        if self.current_experiment_view:
+            self.current_experiment_view.hide()
+
         self.main_view.show()
         self.current_view = self.main_view
+        self.current_experiment_view = None
         self._update_view()  # Refresh the main view data
+
+    def _show_experiment(self, experiment_name: str) -> None:
+        """Show the experiment view for the selected experiment."""
+        # Create the appropriate experiment view
+        if experiment_name == "Text Commands":
+            self.current_experiment_view = TextCommandsExperimentView(experiment_name)
+        elif experiment_name == "Avatar":
+            self.current_experiment_view = AvatarExperimentView(experiment_name)
+        elif experiment_name == "Video":
+            self.current_experiment_view = VideoExperimentView(experiment_name)
+        else:
+            return  # Unknown experiment
+
+        # Connect back signal
+        self.current_experiment_view.back_requested.connect(self._show_main_view)
+
+        # Hide main view and show experiment view
+        self.main_view.hide()
+        self.current_experiment_view.show()
+        self.current_view = self.current_experiment_view
 
     def show(self) -> None:
         """Show the current view window."""

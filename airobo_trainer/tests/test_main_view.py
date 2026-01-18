@@ -20,10 +20,9 @@ class TestMainView:
 
     def test_init(self, view):
         """Test view initialization."""
-        assert view.windowTitle() == "AiRobo-Trainer - MVC Boilerplate"
+        assert view.windowTitle() == "AiRobo-Trainer"
         assert view.list_widget is not None
         assert view.configure_bci_button is not None
-        assert view.status_label is not None
 
     def test_update_list(self, view):
         """Test updating the list widget."""
@@ -40,10 +39,7 @@ class TestMainView:
         view.update_list([])
         assert view.list_widget.count() == 0
 
-    def test_set_status(self, view):
-        """Test setting status message."""
-        view.set_status("Test Status")
-        assert view.status_label.text() == "Test Status"
+
 
     def test_get_selected_index_no_selection(self, view):
         """Test getting selected index when nothing is selected."""

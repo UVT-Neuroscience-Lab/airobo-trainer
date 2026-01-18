@@ -22,7 +22,7 @@ class TestElectrodeWidget:
     def test_init(self, electrode_widget):
         """Test electrode widget initialization."""
         assert electrode_widget.selected_electrodes == set()
-        assert len(electrode_widget.relative_electrode_positions) == 9
+        assert len(electrode_widget.relative_electrode_positions) == 32
 
     def test_get_selected_electrodes(self, electrode_widget):
         """Test getting selected electrodes."""
@@ -45,7 +45,7 @@ class TestElectrodeWidget:
         """Test that electrode positions are calculated correctly."""
         # Test that absolute positions are calculated from relative positions
         positions = electrode_widget._get_absolute_electrode_positions()
-        assert len(positions) == 9  # Should have 9 electrodes
+        assert len(positions) == 32  # Should have 32 electrodes
 
         # All positions should be tuples of (x, y)
         for pos in positions:
@@ -69,8 +69,8 @@ class TestBCIConfigView:
         """Test BCI config view initialization."""
         assert bci_view.windowTitle() == "BCI Configuration"
         assert bci_view.sampling_rate_combo is not None
-        assert bci_view.filter_check is not None
-        assert bci_view.gain_spin is not None
+        assert bci_view.bandpass_combo is not None
+        assert bci_view.notch_combo is not None
         assert bci_view.electrode_widget is not None
         assert bci_view.status_label.text() == "BCI Configuration Ready"
 
@@ -80,17 +80,26 @@ class TestBCIConfigView:
             bci_view.sampling_rate_combo.itemText(i)
             for i in range(bci_view.sampling_rate_combo.count())
         ]
-        assert items == ["250 Hz", "500 Hz", "1000 Hz"]
+        assert items == ["250 Hz", "500 Hz"]
 
-    def test_filter_checkbox_default(self, bci_view):
-        """Test filter checkbox default state."""
-        assert bci_view.filter_check.isChecked() is True
+    def test_bandpass_combo_values(self, bci_view):
+        """Test bandpass filter combo box has correct values."""
+        items = [
+            bci_view.bandpass_combo.itemText(i)
+            for i in range(bci_view.bandpass_combo.count())
+        ]
+        expected = ["0.5Hz-50Hz", "1Hz-40Hz", "2Hz-30Hz", "4Hz-20Hz", "8Hz-12Hz", "0.1Hz-100Hz", "None"]
+        assert items == expected
 
-    def test_gain_spin_defaults(self, bci_view):
-        """Test gain spin box defaults."""
-        assert bci_view.gain_spin.minimum() == 1
-        assert bci_view.gain_spin.maximum() == 100
-        assert bci_view.gain_spin.value() == 24
+    def test_notch_combo_values(self, bci_view):
+        """Test notch filter combo box has correct values."""
+        items = [
+            bci_view.notch_combo.itemText(i)
+            for i in range(bci_view.notch_combo.count())
+        ]
+        expected = ["None", "50Hz", "60Hz", "50Hz + 60Hz", "50Hz (Cascading)", "60Hz (Cascading)"]
+        assert items == expected
+
 
     def test_back_button_signal(self, bci_view, qtbot):
         """Test back button emits signal."""
@@ -121,12 +130,12 @@ class TestBCIConfigView:
 
         assert isinstance(params, dict)
         assert "sampling_rate" in params
-        assert "filter_enabled" in params
-        assert "gain" in params
+        assert "bandpass_filter" in params
+        assert "notch_filter" in params
 
         assert params["sampling_rate"] == "250 Hz"  # Default first item
-        assert params["filter_enabled"] is True
-        assert params["gain"] == 24
+        assert params["bandpass_filter"] == "0.5Hz-50Hz"  # Default first item
+        assert params["notch_filter"] == "None"  # Default first item
 
     def test_electrode_selection_signal(self, bci_view, qtbot):
         """Test electrode selection updates status."""
@@ -149,12 +158,12 @@ class TestBCIConfigView:
         params = bci_view.get_bci_parameters()
         assert params["sampling_rate"] == "500 Hz"
 
-        # Change filter
-        bci_view.filter_check.setChecked(False)
+        # Change bandpass filter
+        bci_view.bandpass_combo.setCurrentIndex(1)  # 1Hz-40Hz
         params = bci_view.get_bci_parameters()
-        assert params["filter_enabled"] is False
+        assert params["bandpass_filter"] == "1Hz-40Hz"
 
-        # Change gain
-        bci_view.gain_spin.setValue(50)
+        # Change notch filter
+        bci_view.notch_combo.setCurrentIndex(1)  # 50Hz
         params = bci_view.get_bci_parameters()
-        assert params["gain"] == 50
+        assert params["notch_filter"] == "50Hz"

@@ -50,9 +50,10 @@ class TestMainController:
         """Test getting the view instance."""
         assert controller.get_view() is view
 
-    def test_status_update_prepopulated_items(self, controller):
-        """Test status label with prepopulated items."""
-        assert controller.view.status_label.text() == "3 items"
+    def test_initial_view_state(self, controller):
+        """Test initial view state."""
+        assert controller.current_view == controller.main_view
+        assert controller.current_experiment_view is None
 
     def test_show_method(self, controller):
         """Test the show method displays the view."""
@@ -103,3 +104,49 @@ class TestMainController:
         # Navigate back to main
         controller._show_main_view()
         assert controller.current_view == controller.main_view
+
+    def test_show_experiment_text_commands(self, controller):
+        """Test showing Text Commands experiment."""
+        controller._show_experiment("Text Commands")
+        assert controller.current_experiment_view is not None
+        assert controller.current_view == controller.current_experiment_view
+        assert "Text Commands" in controller.current_experiment_view.experiment_name
+
+    def test_show_experiment_avatar(self, controller):
+        """Test showing Avatar experiment."""
+        controller._show_experiment("Avatar")
+        assert controller.current_experiment_view is not None
+        assert controller.current_view == controller.current_experiment_view
+        assert controller.current_experiment_view.experiment_name == "Avatar"
+
+    def test_show_experiment_video(self, controller):
+        """Test showing Video experiment."""
+        controller._show_experiment("Video")
+        assert controller.current_experiment_view is not None
+        assert controller.current_view == controller.current_experiment_view
+        assert controller.current_experiment_view.experiment_name == "Video"
+
+    def test_show_experiment_unknown(self, controller):
+        """Test showing unknown experiment does nothing."""
+        initial_view = controller.current_view
+        controller._show_experiment("Unknown Experiment")
+        assert controller.current_view == initial_view
+        assert controller.current_experiment_view is None
+
+    def test_experiment_back_navigation(self, controller):
+        """Test back navigation from experiment view."""
+        # Show an experiment
+        controller._show_experiment("Text Commands")
+        assert controller.current_view == controller.current_experiment_view
+
+        # Simulate back button press
+        controller.current_experiment_view.back_requested.emit()
+        assert controller.current_view == controller.main_view
+        assert controller.current_experiment_view is None
+
+    def test_main_view_experiment_signal(self, controller):
+        """Test that main view experiment selection signal works."""
+        # Simulate experiment selection signal
+        controller.main_view.experiment_selected.emit("Text Commands")
+        assert controller.current_experiment_view is not None
+        assert controller.current_experiment_view.experiment_name == "Text Commands"

@@ -25,6 +25,7 @@ class MainView(QMainWindow):
 
     # Custom signals for user interactions
     configure_bci_requested = pyqtSignal()
+    experiment_selected = pyqtSignal(str)
 
     def __init__(self) -> None:
         """Initialize the main view with all UI components."""
@@ -33,7 +34,7 @@ class MainView(QMainWindow):
 
     def _init_ui(self) -> None:
         """Set up the user interface."""
-        self.setWindowTitle("AiRobo-Trainer - MVC Boilerplate")
+        self.setWindowTitle("AiRobo-Trainer")
         self.setMinimumSize(600, 400)
 
         # Create central widget and main layout
@@ -47,24 +48,35 @@ class MainView(QMainWindow):
         title_label.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         main_layout.addWidget(title_label)
 
+        # Create a container for the list widget to center it
+        list_container = QWidget()
+        list_layout = QVBoxLayout(list_container)
+        list_layout.setContentsMargins(0, 0, 0, 0)
+
         # List widget to display items
         self.list_widget = QListWidget()
         self.list_widget.setAlternatingRowColors(True)
-        main_layout.addWidget(self.list_widget)
+        self.list_widget.setMaximumWidth(400)  # Limit width to fit content better
+        self.list_widget.itemClicked.connect(self._on_item_clicked)
+        list_layout.addWidget(self.list_widget, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Center the list container in the main layout
+        main_layout.addWidget(list_container, alignment=Qt.AlignmentFlag.AlignCenter)
+        main_layout.setAlignment(list_container, Qt.AlignmentFlag.AlignCenter)
 
         # Configure BCI button
         self.configure_bci_button = QPushButton("Configure BCI")
         self.configure_bci_button.clicked.connect(self._on_configure_bci_button_clicked)
-        main_layout.addWidget(self.configure_bci_button)
-
-        # Status label
-        self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: gray; margin: 5px;")
-        main_layout.addWidget(self.status_label)
+        main_layout.addWidget(self.configure_bci_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
     def _on_configure_bci_button_clicked(self) -> None:
         """Handle configure BCI button click event."""
         self.configure_bci_requested.emit()
+
+    def _on_item_clicked(self, item) -> None:
+        """Handle item click event."""
+        experiment_name = item.text()
+        self.experiment_selected.emit(experiment_name)
 
     def update_list(self, items: list[str]) -> None:
         """
@@ -75,15 +87,6 @@ class MainView(QMainWindow):
         """
         self.list_widget.clear()
         self.list_widget.addItems(items)
-
-    def set_status(self, message: str) -> None:
-        """
-        Update the status label with a message.
-
-        Args:
-            message: The status message to display
-        """
-        self.status_label.setText(message)
 
     def show_info(self, title: str, message: str) -> None:
         """

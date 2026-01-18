@@ -29,7 +29,7 @@ class ElectrodeWidget(QFrame):
 
     def __init__(self):
         super().__init__()
-        self.setMinimumSize(300, 300)
+        self.setMinimumSize(450, 450)
         self.setFrameStyle(QFrame.Shape.Box)
         self.selected_electrodes = set()
 
@@ -40,17 +40,42 @@ class ElectrodeWidget(QFrame):
             self.head_image = None
 
         # Define electrode positions as percentages relative to image (0.0 to 1.0)
-        # These represent positions on the head image
+        # 32 electrodes using 10-20 international system
+        # Head is oriented upside down (top of image = back of head, bottom = front of head)
+        # Adjusted positions: frontal electrodes higher, central/parietal electrodes much higher
         self.relative_electrode_positions = [
-            (0.50, 0.15),  # Fz - frontal midline
-            (0.33, 0.25),  # F3 - left frontal
-            (0.67, 0.25),  # F4 - right frontal
-            (0.25, 0.40),  # C3 - left central
-            (0.50, 0.40),  # Cz - central midline
-            (0.75, 0.40),  # C4 - right central
-            (0.33, 0.60),  # P3 - left parietal
-            (0.67, 0.60),  # P4 - right parietal
-            (0.50, 0.75),  # Oz - occipital midline
+            (0.38, 0.83),  # FP1 - left frontopolar (bottom of head, moved slightly higher)
+            (0.62, 0.83),  # FP2 - right frontopolar (also at bottom, slightly different position)
+            (0.42, 0.74),  # AF3 - left anterior frontal (moved higher)
+            (0.58, 0.74),  # AF4 - right anterior frontal (moved higher)
+            (0.25, 0.71),  # F7 - left frontal (moved ~7% higher as requested)
+            (0.38, 0.65),  # F3 - left frontal (moved much higher)
+            (0.50, 0.62),  # FZ - frontal midline (moved much higher)
+            (0.62, 0.65),  # F4 - right frontal (moved much higher)
+            (0.75, 0.71),  # F8 - right frontal (moved ~7% higher as requested)
+            (0.22, 0.58),  # FC5 - left frontocentral (moved higher)
+            (0.38, 0.55),  # FC1 - left frontocentral (moved higher)
+            (0.62, 0.55),  # FC2 - right frontocentral (moved higher)
+            (0.78, 0.58),  # FC6 - right frontocentral (moved higher)
+            (0.18, 0.48),  # T7 - left temporal (moved higher)
+            (0.32, 0.45),  # C3 - left central (moved higher)
+            (0.50, 0.42),  # CZ - central midline (moved higher)
+            (0.68, 0.45),  # C4 - right central (moved higher)
+            (0.82, 0.48),  # T8 - right temporal (moved higher)
+            (0.22, 0.35),  # CP5 - left centroparietal (moved higher)
+            (0.38, 0.38),  # CP1 - left centroparietal (moved higher)
+            (0.62, 0.38),  # CP2 - right centroparietal (moved higher)
+            (0.78, 0.35),  # CP6 - right centroparietal (moved higher)
+            (0.18, 0.28),  # P7 - left parietal (moved higher)
+            (0.32, 0.32),  # P3 - left parietal (moved higher)
+            (0.50, 0.28),  # PZ - parietal midline (moved higher)
+            (0.68, 0.32),  # P4 - right parietal (moved higher)
+            (0.82, 0.28),  # P8 - right parietal (moved higher)
+            (0.25, 0.15),  # PO7 - left parieto-occipital (moved much higher)
+            (0.35, 0.20),  # PO3 - left parieto-occipital (moved much higher)
+            (0.65, 0.20),  # PO4 - right parieto-occipital (moved much higher)
+            (0.75, 0.15),  # PO8 - right parieto-occipital (moved much higher)
+            (0.50, 0.10),  # OZ - occipital midline (top of head)
         ]
 
     def _get_image_geometry(self):
@@ -120,8 +145,9 @@ class ElectrodeWidget(QFrame):
             # Draw electrode label
             painter.setPen(QPen(Qt.GlobalColor.white, 1))
             painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-            labels = ["Fz", "F3", "F4", "C3", "Cz", "C4", "P3", "P4", "Oz"]
-            painter.drawText(x - 10, y + 25, labels[i])
+            labels = ["FP1", "FP2", "AF3", "AF4", "F7", "F3", "FZ", "F4", "F8", "FC5", "FC1", "FC2", "FC6", "T7", "C3", "CZ", "C4", "T8", "CP5", "CP1", "CP2", "CP6", "P7", "P3", "PZ", "P4", "P8", "PO7", "PO3", "PO4", "PO8", "OZ"]
+            if i < len(labels):
+                painter.drawText(x - 10, y + 25, labels[i])
 
     def mousePressEvent(self, event):
         """Handle mouse clicks on electrodes."""
@@ -174,21 +200,38 @@ class BCIConfigView(QMainWindow):
         params_group = QGroupBox("BCI Parameters")
         params_layout = QVBoxLayout(params_group)
 
-        # Placeholder parameters
+        # Sampling rate
         self.sampling_rate_combo = QComboBox()
-        self.sampling_rate_combo.addItems(["250 Hz", "500 Hz", "1000 Hz"])
+        self.sampling_rate_combo.addItems(["250 Hz", "500 Hz"])
         params_layout.addWidget(QLabel("Sampling Rate:"))
         params_layout.addWidget(self.sampling_rate_combo)
 
-        self.filter_check = QCheckBox("Enable Bandpass Filter")
-        self.filter_check.setChecked(True)
-        params_layout.addWidget(self.filter_check)
+        # Bandpass filter dropdown
+        self.bandpass_combo = QComboBox()
+        self.bandpass_combo.addItems([
+            "0.5Hz-50Hz",
+            "1Hz-40Hz",
+            "2Hz-30Hz",
+            "4Hz-20Hz",
+            "8Hz-12Hz",
+            "0.1Hz-100Hz",
+            "None"
+        ])
+        params_layout.addWidget(QLabel("Bandpass Filter:"))
+        params_layout.addWidget(self.bandpass_combo)
 
-        self.gain_spin = QSpinBox()
-        self.gain_spin.setRange(1, 100)
-        self.gain_spin.setValue(24)
-        params_layout.addWidget(QLabel("Gain:"))
-        params_layout.addWidget(self.gain_spin)
+        # Notch filter dropdown
+        self.notch_combo = QComboBox()
+        self.notch_combo.addItems([
+            "None",
+            "50Hz",
+            "60Hz",
+            "50Hz + 60Hz",
+            "50Hz (Cascading)",
+            "60Hz (Cascading)"
+        ])
+        params_layout.addWidget(QLabel("Notch Filter:"))
+        params_layout.addWidget(self.notch_combo)
 
         main_layout.addWidget(params_group)
 
@@ -225,6 +268,6 @@ class BCIConfigView(QMainWindow):
         """Get current BCI parameter settings."""
         return {
             "sampling_rate": self.sampling_rate_combo.currentText(),
-            "filter_enabled": self.filter_check.isChecked(),
-            "gain": self.gain_spin.value(),
+            "bandpass_filter": self.bandpass_combo.currentText(),
+            "notch_filter": self.notch_combo.currentText(),
         }
