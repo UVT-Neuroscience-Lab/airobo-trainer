@@ -1,14 +1,26 @@
 # AiRobo-Trainer
 
-A PyQt6 boilerplate application following strict MVC (Model-View-Controller) architecture and Python best practices.
+**Stroke Rehabilitation Trainer powered by Brain-Computer Interface (BCI) Technology**
+
+AiRobo-Trainer is a medical application designed to assist stroke patients in their rehabilitation journey through BCI-enabled training exercises and monitoring. Built with PyQt6 following strict MVC (Model-View-Controller) architecture and Python best practices.
+
+## Overview
+
+This application provides healthcare professionals and researchers with a configurable interface to manage BCI-based rehabilitation training modules for stroke patients. The system allows configuration of different training modalities including:
+
+- **Text Commands**: Text-based command training for cognitive rehabilitation
+- **Avatar**: Avatar-controlled movement exercises for motor skill recovery
+- **Video**: Video-guided rehabilitation exercises and feedback
 
 ## Features
 
-- **Strict MVC Architecture**: Clean separation between Model (data), View (UI), and Controller (logic)
-- **PyQt6 UI**: Modern Qt6 interface with code-based layouts
-- **Type Hints**: Full type annotations for better code quality
+- **BCI Integration Ready**: Designed for integration with Brain-Computer Interface systems
+- **Medical-Grade Architecture**: Strict MVC separation ensuring reliability and maintainability
+- **Configurable Training Modules**: Easy configuration of rehabilitation training modes
+- **PyQt6 UI**: Modern, accessible Qt6 interface optimized for clinical settings
+- **Type Hints**: Full type annotations for code safety and reliability
 - **Comprehensive Tests**: Unit tests for all components with pytest
-- **Best Practices**: Follows PEP 8 and Python best practices
+- **Best Practices**: Follows PEP 8 and medical software development standards
 
 ## Project Structure
 
@@ -40,22 +52,26 @@ airobo-trainer/
 ## Architecture
 
 ### Model (Data Layer)
-The `ItemModel` class manages application data:
-- Add, remove, and retrieve items
+The `ItemModel` class manages BCI training configuration data:
+- Manages available training modules (Text Commands, Avatar, Video)
+- Remove and retrieve training configurations
 - Data validation and business rules
 - No dependencies on View or Controller
 
 ### View (Presentation Layer)
-The `MainView` class handles UI:
-- QMainWindow with list widget, text input, and buttons
+The `MainView` class handles the configuration UI:
+- "Configure BCI" interface for training module selection
+- List widget displaying available training modules
+- Remove and clear controls for configuration management
 - Emits signals for user interactions
 - No business logic, only UI updates
 
 ### Controller (Logic Layer)
 The `MainController` class coordinates Model and View:
-- Connects View signals to Model operations
-- Handles business logic
+- Connects UI interactions to data operations
+- Manages training module configuration logic
 - Updates View based on Model changes
+- Ensures data consistency for BCI training sessions
 
 ## Installation
 
@@ -162,33 +178,48 @@ pylint airobo_trainer/
 
 ## Usage
 
-The application provides a simple item manager interface:
+The application provides a BCI training configuration interface:
 
-1. **Add Item**: Enter text in the input field and click "Add Item" or press Enter
-2. **Remove Item**: Select an item from the list and click "Remove Selected"
-3. **Clear All**: Click "Clear All" to remove all items
+### Configure BCI Training Modules
+
+The system comes pre-configured with three rehabilitation training modules:
+- **Text Commands**: For cognitive rehabilitation and text-based command training
+- **Avatar**: For motor skill recovery through avatar-controlled exercises
+- **Video**: For video-guided rehabilitation exercises with visual feedback
+
+### Managing Training Modules
+
+1. **Remove Selected**: Select a training module from the list and click "Remove Selected" to exclude it from the current session
+2. **Clear All**: Click "Clear All" to remove all training modules and start fresh
+
+This configuration interface allows healthcare professionals to customize the training session based on the patient's rehabilitation needs and progress.
 
 ## Extending the Application
 
-### Adding a New Model
+### Adding New Training Modules
 
-1. Create a new file in `airobo_trainer/models/`
-2. Implement your model class with data operations
-3. Add to `airobo_trainer/models/__init__.py`
+To add new rehabilitation training modules to the system:
 
-### Adding a New View
+1. **Update Model**: Modify `airobo_trainer/models/item_model.py` to include new training module names
+2. **Extend View**: Add UI components in `airobo_trainer/views/` for module-specific controls
+3. **Update Controller**: Implement logic in `airobo_trainer/controllers/` to handle new module interactions
 
-1. Create a new file in `airobo_trainer/views/`
-2. Implement your view class inheriting from QWidget or QMainWindow
-3. Define signals for user interactions
-4. Add to `airobo_trainer/views/__init__.py`
+### Integrating BCI Hardware
 
-### Adding a New Controller
+To integrate actual BCI hardware:
 
-1. Create a new file in `airobo_trainer/controllers/`
-2. Implement your controller class
-3. Connect View signals to Model operations
-4. Add to `airobo_trainer/controllers/__init__.py`
+1. Create a new BCI interface module in `airobo_trainer/models/`
+2. Implement signal processing and data acquisition logic
+3. Connect BCI signals to training module controllers
+4. Add real-time feedback mechanisms in the View layer
+
+### Custom Rehabilitation Protocols
+
+Healthcare professionals can extend the system by:
+
+1. Adding protocol-specific models for patient data
+2. Creating custom views for protocol monitoring
+3. Implementing protocol-specific controllers for data flow management
 
 ## License
 
@@ -202,7 +233,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+## Medical Disclaimer
+
+This software is provided for research and educational purposes. It is not intended as a medical device and should not be used for clinical diagnosis or treatment without proper validation and regulatory approval. Always consult qualified healthcare professionals for medical advice.
+
 ## Acknowledgments
 
 - Built with [PyQt6](https://www.riverbankcomputing.com/software/pyqt/)
 - Testing with [pytest](https://pytest.org/) and [pytest-qt](https://pytest-qt.readthedocs.io/)
+- Developed for stroke rehabilitation research and BCI technology advancement

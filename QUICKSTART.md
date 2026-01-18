@@ -1,5 +1,7 @@
 # AiRobo-Trainer - Quick Start Guide
 
+**Stroke Rehabilitation Trainer powered by Brain-Computer Interface (BCI)**
+
 ## Installation & Running (3 Steps)
 
 ### 1. Install Dependencies
@@ -19,41 +21,40 @@ pytest
 
 ## What You Get
 
-### Clean MVC Architecture
+### Medical-Grade MVC Architecture
 ```
 Model (item_model.py)
-  ↓ data operations
+  ↓ BCI training configuration data
 Controller (main_controller.py)
-  ↓ connects model & view
+  ↓ manages training module logic
 View (main_view.py)
-  ↓ displays UI
+  ↓ Configure BCI interface
 ```
 
 ### Complete Test Suite
-- **20+ unit tests** covering all components
+- **15+ unit tests** covering all components
 - **pytest-qt** for GUI testing
 - **Coverage reporting** included
+- Medical-grade code quality standards
 
-### Features
-- Add items to a list
-- Remove selected items
-- Clear all items
-- Real-time status updates
-- Input validation
-- Duplicate detection
+### BCI Training Features
+- **Pre-configured Training Modules**: Text Commands, Avatar, Video
+- **Module Management**: Remove or configure training modules for sessions
+- **Real-time Status**: Live updates on configuration state
+- **Healthcare Interface**: Designed for clinical and research settings
 
 ## File Overview
 
 ### Core Application Files
-- `main.py` - Application entry point
-- `airobo_trainer/models/item_model.py` - Data management (98 lines)
-- `airobo_trainer/views/main_view.py` - UI layout (169 lines)
-- `airobo_trainer/controllers/main_controller.py` - Logic (125 lines)
+- `main.py` - BCI Rehabilitation application entry point
+- `airobo_trainer/models/item_model.py` - Training module configuration data
+- `airobo_trainer/views/main_view.py` - Configure BCI interface
+- `airobo_trainer/controllers/main_controller.py` - Training module logic
 
 ### Test Files
-- `airobo_trainer/tests/test_item_model.py` - Model tests (159 lines)
-- `airobo_trainer/tests/test_main_view.py` - View tests (141 lines)
-- `airobo_trainer/tests/test_main_controller.py` - Controller tests (182 lines)
+- `airobo_trainer/tests/test_item_model.py` - Configuration model tests
+- `airobo_trainer/tests/test_main_view.py` - UI interface tests
+- `airobo_trainer/tests/test_main_controller.py` - Training logic tests
 
 ### Configuration Files
 - `requirements.txt` - Production dependencies
@@ -88,49 +89,41 @@ pylint airobo_trainer/                   # Linting
 
 ## Next Steps
 
-1. **Customize the Model**: Add your own data structures in `models/`
-2. **Design Your UI**: Modify or create new views in `views/`
-3. **Add Business Logic**: Extend controllers in `controllers/`
-4. **Write Tests**: Add tests for your new components in `tests/`
+1. **Add Training Modules**: Extend rehabilitation training options in `models/`
+2. **Customize UI**: Adapt the interface for specific clinical needs in `views/`
+3. **Integrate BCI Hardware**: Connect brain-computer interface devices
+4. **Implement Protocols**: Add patient-specific rehabilitation protocols
+5. **Write Tests**: Ensure reliability with comprehensive testing
 
 ## Architecture Benefits
 
-1. **Separation of Concerns**: Each component has a single responsibility
-2. **Testability**: Easy to test each layer independently
-3. **Maintainability**: Changes in one layer don't affect others
-4. **Scalability**: Easy to add new features following the same pattern
-5. **Type Safety**: Full type hints for better IDE support and fewer bugs
+1. **Medical-Grade Reliability**: Strict separation ensures code safety
+2. **Easy Testing**: Each layer can be independently validated
+3. **Clinical Adaptability**: Simple to modify for different protocols
+4. **Research-Friendly**: Clean architecture for academic studies
+5. **Type Safety**: Reduces runtime errors in critical medical applications
 
-## Example: Adding a New Feature
+## Example: Adding a New Training Module
 
-1. **Model**: Add method to `ItemModel`
+1. **Model**: Update prepopulated modules in `ItemModel`
 ```python
-def sort_items(self) -> None:
-    self._items.sort()
+def __init__(self) -> None:
+    self._items: List[str] = [
+        "Text Commands",
+        "Avatar",
+        "Video",
+        "Motor Imagery"  # New module
+    ]
 ```
 
-2. **View**: Add button to `MainView`
-```python
-self.sort_button = QPushButton("Sort")
-self.sort_button.clicked.connect(self._on_sort_clicked)
-```
+2. **View**: Interface automatically displays new modules
 
-3. **Controller**: Connect in `MainController`
-```python
-self.view.sort_button.clicked.connect(self._handle_sort)
+3. **Controller**: Existing logic handles new modules automatically
 
-def _handle_sort(self) -> None:
-    self.model.sort_items()
-    self._update_view()
-```
-
-4. **Test**: Add test in `tests/`
+4. **Test**: Add validation test in `tests/`
 ```python
-def test_sort_items(self, model):
-    model.add_item("Zebra")
-    model.add_item("Apple")
-    model.sort_items()
-    assert model.get_all_items() == ["Apple", "Zebra"]
+def test_init_with_motor_imagery(self, model):
+    assert "Motor Imagery" in model.get_all_items()
 ```
 
 ## Troubleshooting
@@ -153,8 +146,13 @@ Check Python version (requires 3.8+):
 python --version
 ```
 
+## Medical Disclaimer
+
+This software is for research and educational purposes only. Not intended as a medical device. Consult qualified healthcare professionals for clinical use.
+
 ## Support
 
 - Read the full [README.md](README.md) for detailed documentation
 - Check [LICENSE](LICENSE) for usage terms
+- Review [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
 - Open issues on GitHub for bugs or feature requests

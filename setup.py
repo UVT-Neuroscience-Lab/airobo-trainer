@@ -1,5 +1,6 @@
 """
 Setup configuration for AiRobo-Trainer
+A Stroke Rehabilitation Trainer powered by Brain-Computer Interface (BCI)
 """
 
 from setuptools import setup, find_packages
@@ -11,14 +12,17 @@ setup(
     name="airobo-trainer",
     version="0.1.0",
     author="AiRobo Team",
-    description="A PyQt6 MVC boilerplate application",
+    description="A Stroke Rehabilitation Trainer powered by Brain-Computer Interface (BCI) technology",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/yourusername/airobo-trainer",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
+        "Intended Audience :: Healthcare Industry",
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Medical Science Apps.",
+        "Topic :: Scientific/Engineering :: Human Machine Interfaces",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",

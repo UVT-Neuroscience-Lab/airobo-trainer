@@ -1,28 +1,30 @@
 # AiRobo-Trainer Architecture Documentation
 
+**Stroke Rehabilitation Trainer powered by Brain-Computer Interface (BCI)**
+
 ## MVC Pattern Implementation
 
-This application follows a strict Model-View-Controller (MVC) architecture pattern.
+This medical application follows a strict Model-View-Controller (MVC) architecture pattern, ensuring reliability, maintainability, and testability required for healthcare software.
 
 ## Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         main.py                              │
-│                    (Entry Point)                             │
+│            (BCI Rehabilitation Entry Point)                  │
 │  - Creates QApplication                                      │
 │  - Initializes MainController                                │
-│  - Starts event loop                                         │
+│  - Starts BCI configuration interface                        │
 └─────────────────────────┬───────────────────────────────────┘
                           │
                           │ creates
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   MainController                             │
-│                   (CONTROLLER)                               │
+│            (TRAINING MODULE CONTROLLER)                      │
 │  - Initializes Model and View                                │
-│  - Connects signals to slots                                 │
-│  - Handles business logic                                    │
+│  - Manages training module configuration                     │
+│  - Handles BCI session logic                                 │
 │  - Coordinates Model ↔ View                                  │
 └──────────┬────────────────────────────────┬─────────────────┘
            │                                │
@@ -32,32 +34,35 @@ This application follows a strict Model-View-Controller (MVC) architecture patte
 │     ItemModel        │         │       MainView             │
 │     (MODEL)          │         │       (VIEW)               │
 │                      │         │                            │
-│  Data Management:    │         │  UI Components:            │
-│  - add_item()        │         │  - QMainWindow             │
-│  - remove_item()     │         │  - QListWidget             │
-│  - get_item()        │         │  - QLineEdit               │
-│  - get_all_items()   │         │  - QPushButton (Add)       │
-│  - clear_all()       │         │  - QPushButton (Remove)    │
-│  - get_count()       │         │  - QPushButton (Clear)     │
-│  - contains()        │         │  - QLabel (Status)         │
-│                      │         │                            │
-│  No UI dependencies  │         │  Signals:                  │
-│  Pure data logic     │         │  - add_item_requested      │
-│                      │         │  - remove_item_requested   │
+│  Training Config:    │         │  Configure BCI Interface:  │
+│  - Prepopulated:     │         │  - QMainWindow             │
+│    • Text Commands   │         │  - Title: "Configure BCI"  │
+│    • Avatar          │         │  - QListWidget             │
+│    • Video           │         │  - QPushButton (Remove)    │
+│  - remove_item()     │         │  - QPushButton (Clear)     │
+│  - get_item()        │         │  - QLabel (Status)         │
+│  - get_all_items()   │         │                            │
+│  - clear_all()       │         │  Signals:                  │
+│  - get_count()       │         │  - remove_item_requested   │
 │                      │         │  - clear_all_requested     │
+│  No UI dependencies  │         │                            │
+│  Pure data logic     │         │  Clinical interface design │
 └──────────────────────┘         └────────────────────────────┘
 ```
 
 ## Component Responsibilities
 
 ### Model Layer (item_model.py)
-**Responsibility**: Data management and business rules
+**Responsibility**: BCI training module configuration data management
 
 **What it does**:
-- Stores and manages list of items
-- Validates data (no empty strings, no duplicates)
-- Provides data operations (add, remove, get, clear)
-- Maintains data integrity
+- Stores and manages rehabilitation training modules
+- Prepopulated with three core modules:
+  - Text Commands (cognitive rehabilitation)
+  - Avatar (motor skill recovery)
+  - Video (visual feedback exercises)
+- Provides data operations (remove, get, clear)
+- Maintains data integrity for training sessions
 
 **What it does NOT do**:
 - No UI code
@@ -67,24 +72,24 @@ This application follows a strict Model-View-Controller (MVC) architecture patte
 
 **Key Methods**:
 ```python
-add_item(item: str) -> bool
+__init__() -> None  # Prepopulates training modules
 remove_item(index: int) -> bool
 get_item(index: int) -> Optional[str]
 get_all_items() -> List[str]
 clear_all() -> None
 get_count() -> int
-contains(item: str) -> bool
 ```
 
 ### View Layer (main_view.py)
-**Responsibility**: User interface and presentation
+**Responsibility**: BCI configuration user interface
 
 **What it does**:
-- Creates and manages UI widgets
-- Handles layout and styling
-- Emits signals when user interacts
-- Updates display when requested
-- Shows dialogs (info, warning, error)
+- Displays "Configure BCI" clinical interface
+- Shows available training modules in list widget
+- Provides module management controls
+- Emits signals when healthcare professional interacts
+- Updates display when configuration changes
+- Shows dialogs for feedback and warnings
 
 **What it does NOT do**:
 - No business logic
@@ -94,34 +99,33 @@ contains(item: str) -> bool
 
 **Key Components**:
 ```python
-# Widgets
-list_widget: QListWidget
-text_input: QLineEdit
-add_button: QPushButton
-remove_button: QPushButton
-clear_button: QPushButton
-status_label: QLabel
+# UI Widgets
+title_label: QLabel  # "Configure BCI"
+list_widget: QListWidget  # Training modules
+remove_button: QPushButton  # Top, full width
+clear_button: QPushButton  # Bottom, full width
+status_label: QLabel  # Session status
 
 # Signals (emitted to controller)
-add_item_requested = pyqtSignal(str)
 remove_item_requested = pyqtSignal(int)
 clear_all_requested = pyqtSignal()
 
 # Update methods (called by controller)
 update_list(items: List[str])
-clear_input()
 set_status(message: str)
+show_warning(title: str, message: str)
 ```
 
 ### Controller Layer (main_controller.py)
-**Responsibility**: Application logic and coordination
+**Responsibility**: BCI training session logic and coordination
 
 **What it does**:
-- Creates Model and View instances
-- Connects View signals to handler methods
-- Handles business logic (validation, error handling)
-- Updates View based on Model state
-- Makes decisions (show warnings, update status)
+- Creates Model and View instances for BCI configuration
+- Connects UI signals to training module handlers
+- Manages training module removal and clearing logic
+- Updates interface based on configuration state
+- Provides status feedback to healthcare professionals
+- Ensures configuration consistency for rehabilitation sessions
 
 **What it does NOT do**:
 - No direct UI widget manipulation (delegates to View)
@@ -133,9 +137,9 @@ set_status(message: str)
 __init__(model, view)
 _connect_signals()
 _update_view()
+_update_status()
 
 # Signal handlers (private)
-_handle_add_item(item: str)
 _handle_remove_item(index: int)
 _handle_clear_all()
 
