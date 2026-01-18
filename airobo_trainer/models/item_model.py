@@ -68,4 +68,3 @@ class ItemModel:
             The number of items
         """
         return len(self._items)
-

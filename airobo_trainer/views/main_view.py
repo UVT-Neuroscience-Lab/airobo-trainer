@@ -7,11 +7,10 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
     QVBoxLayout,
-    QHBoxLayout,
     QListWidget,
-    QPushButton,
     QLabel,
     QMessageBox,
+    QPushButton,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -25,8 +24,7 @@ class MainView(QMainWindow):
     """
 
     # Custom signals for user interactions
-    remove_item_requested = pyqtSignal(int)
-    clear_all_requested = pyqtSignal()
+    configure_bci_requested = pyqtSignal()
 
     def __init__(self) -> None:
         """Initialize the main view with all UI components."""
@@ -44,43 +42,29 @@ class MainView(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
 
         # Title label
-        title_label = QLabel("Configure BCI")
+        title_label = QLabel("Mode")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setStyleSheet("font-size: 18px; font-weight: bold; margin: 10px;")
         main_layout.addWidget(title_label)
-
-        # Remove button at the top (full width)
-        self.remove_button = QPushButton("Remove Selected")
-        self.remove_button.clicked.connect(self._on_remove_button_clicked)
-        main_layout.addWidget(self.remove_button)
 
         # List widget to display items
         self.list_widget = QListWidget()
         self.list_widget.setAlternatingRowColors(True)
         main_layout.addWidget(self.list_widget)
 
-        # Clear All button at the bottom
-        self.clear_button = QPushButton("Clear All")
-        self.clear_button.clicked.connect(self._on_clear_button_clicked)
-        main_layout.addWidget(self.clear_button)
+        # Configure BCI button
+        self.configure_bci_button = QPushButton("Configure BCI")
+        self.configure_bci_button.clicked.connect(self._on_configure_bci_button_clicked)
+        main_layout.addWidget(self.configure_bci_button)
 
         # Status label
         self.status_label = QLabel("Ready")
         self.status_label.setStyleSheet("color: gray; margin: 5px;")
         main_layout.addWidget(self.status_label)
 
-    def _on_remove_button_clicked(self) -> None:
-        """Handle remove button click event."""
-        current_row = self.list_widget.currentRow()
-        if current_row >= 0:
-            self.remove_item_requested.emit(current_row)
-        else:
-            self.show_warning("No Selection", "Please select an item to remove.")
-
-    def _on_clear_button_clicked(self) -> None:
-        """Handle clear button click event."""
-        if self.list_widget.count() > 0:
-            self.clear_all_requested.emit()
+    def _on_configure_bci_button_clicked(self) -> None:
+        """Handle configure BCI button click event."""
+        self.configure_bci_requested.emit()
 
     def update_list(self, items: list[str]) -> None:
         """

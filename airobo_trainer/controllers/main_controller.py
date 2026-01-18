@@ -7,6 +7,7 @@ from typing import Optional
 
 from airobo_trainer.models.item_model import ItemModel
 from airobo_trainer.views.main_view import MainView
+from airobo_trainer.views.bci_config_view import BCIConfigView
 
 
 class MainController:
@@ -19,14 +20,16 @@ class MainController:
 
     def __init__(self, model: Optional[ItemModel] = None, view: Optional[MainView] = None) -> None:
         """
-        Initialize the controller with model and view.
+        Initialize the controller with model and views.
 
         Args:
             model: The data model (creates new if None)
-            view: The view component (creates new if None)
+            view: The main view component (creates new if None)
         """
         self.model = model if model is not None else ItemModel()
-        self.view = view if view is not None else MainView()
+        self.main_view = view if view is not None else MainView()
+        self.bci_config_view = BCIConfigView()
+        self.current_view = self.main_view  # Track which view is currently active
 
         # Connect view signals to controller methods
         self._connect_signals()
@@ -36,57 +39,41 @@ class MainController:
 
     def _connect_signals(self) -> None:
         """Connect view signals to controller handler methods."""
-        self.view.remove_item_requested.connect(self._handle_remove_item)
-        self.view.clear_all_requested.connect(self._handle_clear_all)
+        self.main_view.configure_bci_requested.connect(self._show_bci_config)
+        self.bci_config_view.back_requested.connect(self._show_main_view)
 
     def _update_view(self) -> None:
-        """Update the view with current model data."""
+        """Update the main view with current model data."""
         items = self.model.get_all_items()
-        self.view.update_list(items)
+        self.main_view.update_list(items)
         self._update_status()
 
     def _update_status(self) -> None:
         """Update the status label with current item count."""
         count = self.model.get_count()
         if count == 0:
-            self.view.set_status("No items")
+            self.current_view.set_status("No items")
         elif count == 1:
-            self.view.set_status("1 item")
+            self.current_view.set_status("1 item")
         else:
-            self.view.set_status(f"{count} items")
+            self.current_view.set_status(f"{count} items")
 
-    def _handle_remove_item(self, index: int) -> None:
-        """
-        Handle the remove item request from the view.
+    def _show_bci_config(self) -> None:
+        """Show the BCI configuration view."""
+        self.main_view.hide()
+        self.bci_config_view.show()
+        self.current_view = self.bci_config_view
 
-        Args:
-            index: The index of the item to remove
-        """
-        item = self.model.get_item(index)
-        if item is None:
-            self.view.show_warning("Invalid Selection", "Please select a valid item.")
-            return
-
-        success = self.model.remove_item(index)
-        if success:
-            self._update_view()
-            self.view.set_status(f"Removed: {item}")
-        else:
-            self.view.show_error("Error", "Failed to remove item.")
-
-    def _handle_clear_all(self) -> None:
-        """Handle the clear all request from the view."""
-        count = self.model.get_count()
-        if count == 0:
-            return
-
-        self.model.clear_all()
-        self._update_view()
-        self.view.set_status(f"Cleared {count} item{'s' if count != 1 else ''}")
+    def _show_main_view(self) -> None:
+        """Show the main view."""
+        self.bci_config_view.hide()
+        self.main_view.show()
+        self.current_view = self.main_view
+        self._update_view()  # Refresh the main view data
 
     def show(self) -> None:
-        """Show the main view window."""
-        self.view.show()
+        """Show the current view window."""
+        self.current_view.show()
 
     def get_model(self) -> ItemModel:
         """
@@ -97,11 +84,30 @@ class MainController:
         """
         return self.model
 
-    def get_view(self) -> MainView:
+    @property
+    def view(self) -> MainView:
         """
-        Get the view instance.
+        Get the main view instance (backward compatibility property).
 
         Returns:
-            The view instance
+            The main view instance
         """
-        return self.view
+        return self.main_view
+
+    def get_view(self) -> MainView:
+        """
+        Get the main view instance.
+
+        Returns:
+            The main view instance
+        """
+        return self.main_view
+
+    def get_bci_config_view(self) -> BCIConfigView:
+        """
+        Get the BCI configuration view instance.
+
+        Returns:
+            The BCI configuration view instance
+        """
+        return self.bci_config_view

@@ -50,65 +50,56 @@ class TestMainController:
         """Test getting the view instance."""
         assert controller.get_view() is view
 
-    def test_handle_remove_item_success(self, controller):
-        """Test successfully removing an item through controller."""
-        controller._handle_remove_item(0)
-        assert controller.model.get_count() == 2
-        assert controller.view.list_widget.count() == 2
-
-    def test_handle_remove_item_invalid_index(self, controller, monkeypatch):
-        """Test removing an item with invalid index shows warning."""
-        warning_calls = []
-        monkeypatch.setattr(
-            controller.view, "show_warning",
-            lambda *args: warning_calls.append(args)
-        )
-
-        controller._handle_remove_item(5)
-        assert len(warning_calls) == 1
-        assert controller.model.get_count() == 3
-
-    def test_handle_clear_all(self, controller):
-        """Test clearing all items through controller."""
-        assert controller.model.get_count() == 3
-
-        controller._handle_clear_all()
-        assert controller.model.get_count() == 0
-        assert controller.view.list_widget.count() == 0
-
-    def test_handle_clear_all_empty_list(self, controller):
-        """Test clearing when list is already empty."""
-        controller._handle_clear_all()
-        initial_status = controller.view.status_label.text()
-        controller._handle_clear_all()
-        # Status should not change when clearing empty list
-        assert controller.view.status_label.text() == initial_status
-
     def test_status_update_prepopulated_items(self, controller):
         """Test status label with prepopulated items."""
         assert controller.view.status_label.text() == "3 items"
-
-    def test_signal_connections(self, controller, qtbot):
-        """Test that view signals are properly connected to controller."""
-        # Test remove_item_requested signal
-        controller.view.list_widget.setCurrentRow(0)
-        controller.view.remove_button.click()
-        qtbot.wait(100)
-        assert controller.model.get_count() == 2
-
-    def test_integration_remove_items(self, controller):
-        """Test integration of removing items."""
-        assert controller.model.get_count() == 3
-        assert controller.view.list_widget.count() == 3
-
-        # Remove middle item
-        controller._handle_remove_item(1)
-        assert controller.model.get_count() == 2
-        assert controller.view.list_widget.count() == 2
-        assert controller.view.list_widget.item(0).text() == "Text Commands"
-        assert controller.view.list_widget.item(1).text() == "Video"
 
     def test_show_method(self, controller):
         """Test the show method displays the view."""
         controller.show()
         assert controller.view.isVisible()
+
+    def test_get_bci_config_view(self, controller):
+        """Test getting the BCI configuration view instance."""
+        bci_view = controller.get_bci_config_view()
+        assert bci_view is not None
+        assert hasattr(bci_view, "back_requested")
+
+    def test_signal_connections(self, controller):
+        """Test that view signals are properly connected to controller."""
+        # Test configure_bci_requested signal connection
+        controller.main_view.configure_bci_requested.emit()
+        # Should switch to BCI config view
+        assert controller.current_view == controller.bci_config_view
+
+    def test_show_bci_config(self, controller):
+        """Test showing BCI configuration view."""
+        controller._show_bci_config()
+        assert controller.current_view == controller.bci_config_view
+        assert not controller.main_view.isVisible()
+        # Note: bci_config_view visibility check would require qtbot
+
+    def test_show_main_view(self, controller):
+        """Test showing main view from BCI config."""
+        # First switch to BCI config
+        controller._show_bci_config()
+        assert controller.current_view == controller.bci_config_view
+
+        # Then switch back to main
+        controller._show_main_view()
+        assert controller.current_view == controller.main_view
+        # Should refresh the view data
+        assert controller.view.list_widget.count() == 3
+
+    def test_navigation_workflow(self, controller):
+        """Test complete navigation workflow."""
+        # Start on main view
+        assert controller.current_view == controller.main_view
+
+        # Navigate to BCI config
+        controller._show_bci_config()
+        assert controller.current_view == controller.bci_config_view
+
+        # Navigate back to main
+        controller._show_main_view()
+        assert controller.current_view == controller.main_view
