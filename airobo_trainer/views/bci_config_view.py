@@ -9,8 +9,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QLabel,
     QPushButton,
-    QCheckBox,
-    QSpinBox,
     QComboBox,
     QGroupBox,
     QFrame,
@@ -145,7 +143,40 @@ class ElectrodeWidget(QFrame):
             # Draw electrode label
             painter.setPen(QPen(Qt.GlobalColor.white, 1))
             painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-            labels = ["FP1", "FP2", "AF3", "AF4", "F7", "F3", "FZ", "F4", "F8", "FC5", "FC1", "FC2", "FC6", "T7", "C3", "CZ", "C4", "T8", "CP5", "CP1", "CP2", "CP6", "P7", "P3", "PZ", "P4", "P8", "PO7", "PO3", "PO4", "PO8", "OZ"]
+            labels = [
+                "FP1",
+                "FP2",
+                "AF3",
+                "AF4",
+                "F7",
+                "F3",
+                "FZ",
+                "F4",
+                "F8",
+                "FC5",
+                "FC1",
+                "FC2",
+                "FC6",
+                "T7",
+                "C3",
+                "CZ",
+                "C4",
+                "T8",
+                "CP5",
+                "CP1",
+                "CP2",
+                "CP6",
+                "P7",
+                "P3",
+                "PZ",
+                "P4",
+                "P8",
+                "PO7",
+                "PO3",
+                "PO4",
+                "PO8",
+                "OZ",
+            ]
             if i < len(labels):
                 painter.drawText(x - 10, y + 25, labels[i])
 
@@ -208,28 +239,33 @@ class BCIConfigView(QMainWindow):
 
         # Bandpass filter dropdown
         self.bandpass_combo = QComboBox()
-        self.bandpass_combo.addItems([
-            "0.5Hz-50Hz",
-            "1Hz-40Hz",
-            "2Hz-30Hz",
-            "4Hz-20Hz",
-            "8Hz-12Hz",
-            "0.1Hz-100Hz",
-            "None"
-        ])
+        self.bandpass_combo.addItems(
+            [
+                "0.1 – 30 Hz Bandpass",
+                "0.1 – 50 Hz Bandpass",
+                "0.5 – 30 Hz Bandpass",
+                "0.5 – 50 Hz Bandpass",
+                "1 – 30 Hz Bandpass",
+                "1 – 50 Hz Bandpass",
+                "2 – 30 Hz Bandpass",
+                "2 – 50 Hz Bandpass",
+                "0.1 Hz Highpass",
+                "0.5 Hz Highpass",
+                "1 Hz Highpass",
+                "2 Hz Highpass",
+                "20 Hz Lowpass",
+                "50 Hz Lowpass",
+                "None - No filter applied",
+            ]
+        )
         params_layout.addWidget(QLabel("Bandpass Filter:"))
         params_layout.addWidget(self.bandpass_combo)
 
         # Notch filter dropdown
         self.notch_combo = QComboBox()
-        self.notch_combo.addItems([
-            "None",
-            "50Hz",
-            "60Hz",
-            "50Hz + 60Hz",
-            "50Hz (Cascading)",
-            "60Hz (Cascading)"
-        ])
+        self.notch_combo.addItems(
+            ["None", "50Hz", "60Hz", "50Hz + 60Hz", "50Hz (Cascading)", "60Hz (Cascading)"]
+        )
         params_layout.addWidget(QLabel("Notch Filter:"))
         params_layout.addWidget(self.notch_combo)
 

@@ -11,7 +11,7 @@ from airobo_trainer.views.bci_config_view import BCIConfigView
 from airobo_trainer.views.experiment_views import (
     TextCommandsExperimentView,
     AvatarExperimentView,
-    VideoExperimentView
+    VideoExperimentView,
 )
 
 
@@ -58,7 +58,7 @@ class MainController:
     def _update_status(self) -> None:
         """Update the status label with current item count."""
         # Only update status for views that have status functionality
-        if hasattr(self.current_view, 'set_status'):
+        if hasattr(self.current_view, "set_status"):
             count = self.model.get_count()
             if count == 0:
                 self.current_view.set_status("No items")

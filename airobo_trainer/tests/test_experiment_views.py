@@ -11,7 +11,7 @@ from airobo_trainer.views.experiment_views import (
     BaseExperimentView,
     TextCommandsExperimentView,
     AvatarExperimentView,
-    VideoExperimentView
+    VideoExperimentView,
 )
 
 
@@ -60,10 +60,12 @@ class TestBaseExperimentView:
     @pytest.fixture
     def base_view(self, qtbot: QtBot):
         """Create a BaseExperimentView instance for testing."""
+
         # Create a minimal implementation for testing
         class TestExperimentView(BaseExperimentView):
             def _create_center_content(self):
                 from PyQt6.QtWidgets import QLabel
+
                 return QLabel("Test Content")
 
         view = TestExperimentView("Test Experiment")
@@ -122,7 +124,7 @@ class TestTextCommandsExperimentView:
         labels = text_view.center_content.findChildren(QLabel)
         text_label = None
         for label in labels:
-            if hasattr(label, 'text'):
+            if hasattr(label, "text"):
                 text_label = label
                 break
 
@@ -185,7 +187,7 @@ class TestVideoExperimentView:
         labels = video_view.center_content.findChildren(QLabel)
         placeholder_label = None
         for label in labels:
-            if hasattr(label, 'text'):
+            if hasattr(label, "text"):
                 placeholder_label = label
                 break
 

@@ -71,7 +71,9 @@ class MuscleBar(QFrame):
         bar_width = 50
         bar_height = min(200, bar_available_height)  # Use available space, max 200
         bar_x = (self.width() - bar_width) // 2
-        bar_y = bar_start_y + (bar_available_height - bar_height) // 2  # Center vertically in available space
+        bar_y = (
+            bar_start_y + (bar_available_height - bar_height) // 2
+        )  # Center vertically in available space
 
         segment_height = bar_height // 6
 
@@ -131,7 +133,9 @@ class BaseExperimentView(QMainWindow):
         # Experiment title right underneath back button
         title_label = QLabel(self.experiment_name)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold; margin: 15px 0 20px 0; color: #FFF;")
+        title_label.setStyleSheet(
+            "font-size: 24px; font-weight: bold; margin: 15px 0 20px 0; color: #FFF;"
+        )
         main_layout.addWidget(title_label)
 
         # Create horizontal layout for content with edge-positioned bars
@@ -151,7 +155,9 @@ class BaseExperimentView(QMainWindow):
 
         # Center content area (takes remaining space)
         self.center_content = self._create_center_content()
-        self.center_content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.center_content.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         content_layout.addWidget(self.center_content, 1)  # Takes remaining space
 
         # Right spacer (10% of width)
@@ -246,7 +252,9 @@ class TextCommandsExperimentView(BaseExperimentView):
         layout.setSpacing(10)
 
         # Text display area with word wrapping
-        text_label = QLabel("Command: RELAX\n\nPlease follow the voice instructions to control the system using your thoughts.")
+        text_label = QLabel(
+            "Command: RELAX\n\nPlease follow the voice instructions to control the system using your thoughts."
+        )
         text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         text_label.setWordWrap(True)  # Enable word wrapping
         text_label.setStyleSheet("""
@@ -308,15 +316,17 @@ class AvatarExperimentView(BaseExperimentView):
 
     def _scale_avatar_image(self):
         """Scale the avatar image to fit the available space."""
-        if hasattr(self, 'original_pixmap') and not self.original_pixmap.isNull():
+        if hasattr(self, "original_pixmap") and not self.original_pixmap.isNull():
             # Get the size of the avatar label
             label_size = self.avatar_label.size()
-            if label_size.width() > 50 and label_size.height() > 50:  # Ensure we have valid dimensions
+            if (
+                label_size.width() > 50 and label_size.height() > 50
+            ):  # Ensure we have valid dimensions
                 # Scale to fit while maintaining aspect ratio
                 scaled_pixmap = self.original_pixmap.scaled(
                     label_size,
                     Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
+                    Qt.TransformationMode.SmoothTransformation,
                 )
                 self.avatar_label.setPixmap(scaled_pixmap)
 
@@ -324,7 +334,7 @@ class AvatarExperimentView(BaseExperimentView):
         """Handle window resize to rescale avatar image."""
         super().resizeEvent(event)
         # Rescale the avatar image when the window resizes
-        if hasattr(self, '_scale_avatar_image'):
+        if hasattr(self, "_scale_avatar_image"):
             self._scale_avatar_image()
 
 

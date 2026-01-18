@@ -39,8 +39,6 @@ class TestMainView:
         view.update_list([])
         assert view.list_widget.count() == 0
 
-
-
     def test_get_selected_index_no_selection(self, view):
         """Test getting selected index when nothing is selected."""
         view.update_list(["Item 1", "Item 2"])

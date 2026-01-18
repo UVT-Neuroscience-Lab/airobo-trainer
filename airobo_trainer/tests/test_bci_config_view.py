@@ -85,21 +85,32 @@ class TestBCIConfigView:
     def test_bandpass_combo_values(self, bci_view):
         """Test bandpass filter combo box has correct values."""
         items = [
-            bci_view.bandpass_combo.itemText(i)
-            for i in range(bci_view.bandpass_combo.count())
+            bci_view.bandpass_combo.itemText(i) for i in range(bci_view.bandpass_combo.count())
         ]
-        expected = ["0.5Hz-50Hz", "1Hz-40Hz", "2Hz-30Hz", "4Hz-20Hz", "8Hz-12Hz", "0.1Hz-100Hz", "None"]
+        expected = [
+            "0.1 – 30 Hz Bandpass",
+            "0.1 – 50 Hz Bandpass",
+            "0.5 – 30 Hz Bandpass",
+            "0.5 – 50 Hz Bandpass",
+            "1 – 30 Hz Bandpass",
+            "1 – 50 Hz Bandpass",
+            "2 – 30 Hz Bandpass",
+            "2 – 50 Hz Bandpass",
+            "0.1 Hz Highpass",
+            "0.5 Hz Highpass",
+            "1 Hz Highpass",
+            "2 Hz Highpass",
+            "20 Hz Lowpass",
+            "50 Hz Lowpass",
+            "None - No filter applied",
+        ]
         assert items == expected
 
     def test_notch_combo_values(self, bci_view):
         """Test notch filter combo box has correct values."""
-        items = [
-            bci_view.notch_combo.itemText(i)
-            for i in range(bci_view.notch_combo.count())
-        ]
+        items = [bci_view.notch_combo.itemText(i) for i in range(bci_view.notch_combo.count())]
         expected = ["None", "50Hz", "60Hz", "50Hz + 60Hz", "50Hz (Cascading)", "60Hz (Cascading)"]
         assert items == expected
-
 
     def test_back_button_signal(self, bci_view, qtbot):
         """Test back button emits signal."""
@@ -134,7 +145,7 @@ class TestBCIConfigView:
         assert "notch_filter" in params
 
         assert params["sampling_rate"] == "250 Hz"  # Default first item
-        assert params["bandpass_filter"] == "0.5Hz-50Hz"  # Default first item
+        assert params["bandpass_filter"] == "0.1 – 30 Hz Bandpass"  # Default first item
         assert params["notch_filter"] == "None"  # Default first item
 
     def test_electrode_selection_signal(self, bci_view, qtbot):
@@ -159,9 +170,9 @@ class TestBCIConfigView:
         assert params["sampling_rate"] == "500 Hz"
 
         # Change bandpass filter
-        bci_view.bandpass_combo.setCurrentIndex(1)  # 1Hz-40Hz
+        bci_view.bandpass_combo.setCurrentIndex(1)  # 0.1 – 50 Hz Bandpass
         params = bci_view.get_bci_parameters()
-        assert params["bandpass_filter"] == "1Hz-40Hz"
+        assert params["bandpass_filter"] == "0.1 – 50 Hz Bandpass"
 
         # Change notch filter
         bci_view.notch_combo.setCurrentIndex(1)  # 50Hz
