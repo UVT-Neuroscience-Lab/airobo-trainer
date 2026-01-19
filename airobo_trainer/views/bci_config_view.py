@@ -307,3 +307,7 @@ class BCIConfigView(QMainWindow):
             "bandpass_filter": self.bandpass_combo.currentText(),
             "notch_filter": self.notch_combo.currentText(),
         }
+
+    def set_status(self, message: str):
+        """Set the status label text."""
+        self.status_label.setText(message)

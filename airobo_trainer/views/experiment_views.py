@@ -13,8 +13,10 @@ from PyQt6.QtWidgets import (
     QFrame,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QRect
+from PyQt6.QtCore import Qt, pyqtSignal, QRect, QTimer, QUrl
 from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QPixmap
+from PyQt6.QtMultimedia import QMediaPlayer
+from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 
 class MuscleBar(QFrame):
@@ -82,13 +84,35 @@ class MuscleBar(QFrame):
             segment_y = bar_y + bar_height - (i + 1) * segment_height
             activation = self.activation_levels[i]
 
-            # Color based on activation level
-            if activation > 70:
-                color = QColor(0, 255, 0)  # Green for high activation
-            elif activation > 40:
-                color = QColor(255, 255, 0)  # Yellow for medium activation
+            # Only color activated segments, others remain grey
+            if activation > 10:  # Threshold for considering it "activated"
+                # Color based on segment position: red, orange, yellow, yellowish-green, light green, dark green
+                if i == 0:
+                    color = QColor(255, 0, 0)  # Red (bottom segment)
+                elif i == 1:
+                    color = QColor(255, 165, 0)  # Orange
+                elif i == 2:
+                    color = QColor(255, 255, 0)  # Yellow
+                elif i == 3:
+                    color = QColor(173, 255, 47)  # Yellowish-green
+                elif i == 4:
+                    color = QColor(144, 238, 144)  # Light green
+                else:  # i == 5
+                    color = QColor(0, 100, 0)  # Dark green (top segment)
+
+                # Apply activation level as opacity
+                if activation < 30:
+                    # Very low activation - make it more transparent
+                    color.setAlpha(100)
+                elif activation < 70:
+                    # Medium activation - semi-transparent
+                    color.setAlpha(180)
+                else:
+                    # High activation - fully opaque
+                    color.setAlpha(255)
             else:
-                color = QColor(128, 128, 128)  # Gray for low activation (initial state)
+                # Not activated - use grey
+                color = QColor(128, 128, 128)  # Grey for inactive segments
 
             painter.fillRect(bar_x, segment_y, bar_width, segment_height, color)
 
@@ -111,7 +135,21 @@ class BaseExperimentView(QMainWindow):
     def __init__(self, experiment_name: str):
         super().__init__()
         self.experiment_name = experiment_name
+        self.current_mode = "relax"  # "left", "right", or "relax"
+        self.oscillation_timer = QTimer()
+        self.oscillation_timer.timeout.connect(self._update_muscle_bars)
+        self.transition_timer = QTimer()
+        self.transition_timer.timeout.connect(self._update_transition)
+        self.transition_progress = 0.0  # 0.0 to 1.0
+        self.transition_duration = 2000  # 2 seconds in milliseconds
+        self.transitioning = False
+        self.current_left_levels = [0] * 6
+        self.current_right_levels = [0] * 6
+        self.target_left_levels = [0] * 6
+        self.target_right_levels = [0] * 6
         self._init_ui()
+        # Start with relax oscillation
+        self._start_gradual_transition("relax")
 
     def _init_ui(self):
         """Set up the basic experiment interface."""
@@ -177,6 +215,10 @@ class BaseExperimentView(QMainWindow):
         self._center_spacer = center_spacer
         self._right_spacer = right_spacer
 
+        # Add status label for compatibility with controller
+        self.status_label = QLabel("")
+        self.status_label.hide()  # Hide by default since experiments don't show status
+
     def resizeEvent(self, event):
         """Handle window resize to maintain percentage-based spacing."""
         super().resizeEvent(event)
@@ -212,6 +254,149 @@ class BaseExperimentView(QMainWindow):
         """Handle back button click."""
         self.back_requested.emit()
 
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts for simulation."""
+        if event.key() == Qt.Key.Key_1:  # Left hand
+            self.set_simulation_mode("left")
+        elif event.key() == Qt.Key.Key_2:  # Right hand
+            self.set_simulation_mode("right")
+        elif event.key() == Qt.Key.Key_3:  # Relax
+            self.set_simulation_mode("relax")
+        else:
+            super().keyPressEvent(event)
+
+    def set_simulation_mode(self, mode: str):
+        """Set the simulation mode and update content accordingly."""
+        # Update content immediately
+        self.current_mode = mode
+
+        if mode == "left":
+            self._show_left_hand_content()
+        elif mode == "right":
+            self._show_right_hand_content()
+        elif mode == "relax":
+            self._show_relax_content()
+
+        # Start gradual transition to new oscillation pattern
+        self._start_gradual_transition(mode)
+
+    def _start_gradual_transition(self, target_mode: str):
+        """Start a gradual transition to the target oscillation pattern."""
+        # Stop any existing transitions
+        self.transition_timer.stop()
+        self.oscillation_timer.stop()
+
+        # Set current levels as starting point
+        self.current_left_levels = [self.left_arm_bar.activation_levels[i] for i in range(6)]
+        self.current_right_levels = [self.right_arm_bar.activation_levels[i] for i in range(6)]
+
+        # Calculate target levels based on mode
+        if target_mode == "left":
+            # Left hand active: 53-87%, Right hand inactive: 6-18%
+            left_activation = 70  # Average target
+            right_activation = 12  # Average target
+        elif target_mode == "right":
+            # Right hand active: 53-87%, Left hand inactive: 6-18%
+            right_activation = 70  # Average target
+            left_activation = 12  # Average target
+        elif target_mode == "relax":
+            # Both arms oscillating: 12-34%
+            left_activation = 23  # Average target
+            right_activation = 23  # Average target
+        else:
+            return
+
+        # Calculate target levels for each bar segment
+        self.target_left_levels = []
+        self.target_right_levels = []
+        for i in range(6):
+            left_level = min(100, max(0, int((left_activation - i * 16.7) * 6)))
+            right_level = min(100, max(0, int((right_activation - i * 16.7) * 6)))
+            self.target_left_levels.append(left_level)
+            self.target_right_levels.append(right_level)
+
+        # Start the gradual transition
+        self.transition_progress = 0.0
+        self.transitioning = True
+        self.transition_timer.start(50)  # Update every 50ms for smooth transition
+
+    def _update_transition(self):
+        """Update the gradual transition between oscillation patterns."""
+        if not self.transitioning:
+            return
+
+        # Update progress (2 seconds total = 2000ms, updates every 50ms = 40 steps)
+        self.transition_progress += 0.025  # 1/40 = 0.025
+
+        if self.transition_progress >= 1.0:
+            # Transition complete
+            self.transition_progress = 1.0
+            self.transitioning = False
+            self.transition_timer.stop()
+            # Start normal oscillation
+            self.oscillation_timer.start(200)
+        else:
+            # Interpolate between current and target levels
+            for i in range(6):
+                current_left = self.current_left_levels[i]
+                target_left = self.target_left_levels[i]
+                current_right = self.current_right_levels[i]
+                target_right = self.target_right_levels[i]
+
+                # Smooth interpolation
+                interpolated_left = (
+                    current_left + (target_left - current_left) * self.transition_progress
+                )
+                interpolated_right = (
+                    current_right + (target_right - current_right) * self.transition_progress
+                )
+
+                self.left_arm_bar.set_activation(i, int(interpolated_left))
+                self.right_arm_bar.set_activation(i, int(interpolated_right))
+
+    def _show_left_hand_content(self):
+        """Show content for left hand simulation."""
+        # This will be overridden by subclasses
+        pass
+
+    def _show_right_hand_content(self):
+        """Show content for right hand simulation."""
+        # This will be overridden by subclasses
+        pass
+
+    def _show_relax_content(self):
+        """Show content for relax period."""
+        # This will be overridden by subclasses
+        pass
+
+    def _update_muscle_bars(self):
+        """Update muscle bar activations with oscillating values."""
+        import random
+
+        if self.current_mode == "left":
+            # Left hand active: 53-87%, Right hand inactive: 6-18%
+            left_activation = random.randint(53, 87)
+            right_activation = random.randint(6, 18)
+        elif self.current_mode == "right":
+            # Right hand active: 53-87%, Left hand inactive: 6-18%
+            right_activation = random.randint(53, 87)
+            left_activation = random.randint(6, 18)
+        elif self.current_mode == "relax":
+            # Both arms oscillating: 12-34%
+            left_activation = random.randint(12, 34)
+            right_activation = random.randint(12, 34)
+        else:
+            return
+
+        # Fill bars from bottom to top based on activation level
+        # Each bar represents ~16.7% of total activation
+        for i in range(6):
+            left_level = min(100, max(0, int((left_activation - i * 16.7) * 6)))
+            right_level = min(100, max(0, int((right_activation - i * 16.7) * 6)))
+
+            self.left_arm_bar.set_activation(i, left_level)
+            self.right_arm_bar.set_activation(i, right_level)
+
     def update_muscle_activation(self, arm: str, segment: int, level: int):
         """
         Update muscle activation level.
@@ -225,6 +410,10 @@ class BaseExperimentView(QMainWindow):
             self.left_arm_bar.set_activation(segment, level)
         elif arm.lower() == "right":
             self.right_arm_bar.set_activation(segment, level)
+
+    def set_status(self, message: str):
+        """Set the status label text (hidden by default for experiments)."""
+        self.status_label.setText(message)
 
 
 class TextCommandsExperimentView(BaseExperimentView):
@@ -252,21 +441,39 @@ class TextCommandsExperimentView(BaseExperimentView):
         layout.setSpacing(10)
 
         # Text display area with word wrapping
-        text_label = QLabel(
-            "Command: RELAX\n\nPlease follow the voice instructions to control the system using your thoughts."
+        self.text_label = QLabel(
+            "Command: RELAX\n\nPlease follow the instructions to control the system using your thoughts."
         )
-        text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        text_label.setWordWrap(True)  # Enable word wrapping
-        text_label.setStyleSheet("""
+        self.text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.text_label.setWordWrap(True)  # Enable word wrapping
+        self.text_label.setStyleSheet("""
             QLabel {
                 font-size: 14px;
                 color: #333;
                 line-height: 1.4;
             }
         """)
-        layout.addWidget(text_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.text_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         return widget
+
+    def _show_left_hand_content(self):
+        """Show left hand command."""
+        self.text_label.setText(
+            "LEFT HAND\n\nImagine moving your left hand.\nFocus on the movement and muscle activation."
+        )
+
+    def _show_right_hand_content(self):
+        """Show right hand command."""
+        self.text_label.setText(
+            "RIGHT HAND\n\nImagine moving your right hand.\nFocus on the movement and muscle activation."
+        )
+
+    def _show_relax_content(self):
+        """Show relax command."""
+        self.text_label.setText(
+            "Command: RELAX\n\nPlease follow the instructions to control the system using your thoughts."
+        )
 
 
 class AvatarExperimentView(BaseExperimentView):
@@ -291,28 +498,74 @@ class AvatarExperimentView(BaseExperimentView):
             }
         """)
 
+        layout = QVBoxLayout(widget)
+
         # Avatar image label that will be resized dynamically
         self.avatar_label = QLabel()
         self.avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.avatar_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.avatar_label.setMinimumSize(100, 100)
+        self.avatar_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored
+        )  # Fixed size
+        self.avatar_label.setFixedSize(400, 500)  # Fixed size to prevent collapse
 
-        # Load the l_hand.png image
-        self.original_pixmap = QPixmap("airobo_trainer/assets/images/l_hand.png")
-        if not self.original_pixmap.isNull():
-            # Initial scaling will be done in resizeEvent
-            self._scale_avatar_image()
-        else:
-            # Fallback if image can't be loaded
-            self.avatar_label.setText("Avatar Image\n(Could not load l_hand.png)")
-            self.avatar_label.setStyleSheet("font-size: 14px; color: #666;")
+        # Bottom text label for arm indication
+        self.arm_label = QLabel("Left Arm")
+        self.arm_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.arm_label.setStyleSheet("""
+            QLabel {
+                background-color: #add8e6;
+                color: #000;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 8px;
+                border-radius: 5px;
+                margin: 5px;
+            }
+        """)
+        self.arm_label.setMaximumHeight(40)
 
-        layout = QVBoxLayout(widget)
+        # Start in relax mode - no initial image
+        self.arm_label.setText("Relax")
+
         layout.addWidget(self.avatar_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.arm_label, alignment=Qt.AlignmentFlag.AlignBottom)
 
         # Store widget reference for resize handling
         widget.avatar_widget = self
         return widget
+
+    def _load_avatar_image(self, hand: str):
+        """Load the appropriate avatar image for the specified hand."""
+        if hand == "left":
+            image_path = "airobo_trainer/assets/images/l_hand.png"
+        elif hand == "right":
+            image_path = "airobo_trainer/assets/images/r_hand.png"
+        else:
+            image_path = "airobo_trainer/assets/images/l_hand.png"  # Default
+
+        self.original_pixmap = QPixmap(image_path)
+        if not self.original_pixmap.isNull():
+            # Immediately scale to fit available space
+            self._scale_avatar_image()
+        else:
+            # Fallback if image can't be loaded
+            self.avatar_label.setText(f"Avatar Image\n(Could not load {image_path})")
+            self.avatar_label.setStyleSheet("font-size: 14px; color: #666;")
+
+    def _show_left_hand_content(self):
+        """Show left hand avatar."""
+        self._load_avatar_image("left")
+        self.arm_label.setText("Left Arm")
+
+    def _show_right_hand_content(self):
+        """Show right hand avatar."""
+        self._load_avatar_image("right")
+        self.arm_label.setText("Right Arm")
+
+    def _show_relax_content(self):
+        """Show relax state - clear avatar image and update label."""
+        self.avatar_label.clear()  # Clear the image
+        self.arm_label.setText("Relax")
 
     def _scale_avatar_image(self):
         """Scale the avatar image to fit the available space."""
@@ -344,6 +597,24 @@ class VideoExperimentView(BaseExperimentView):
     Shows video area in the center, ready for video playback.
     """
 
+    def __init__(self, experiment_name: str):
+        # Preload videos for seamless switching
+        self._preload_videos()
+        super().__init__(experiment_name)
+
+    def _preload_videos(self):
+        """Preload video files for seamless playback switching."""
+        # For now, just check if files exist and store paths
+        # In a real implementation, this would load video data into memory
+        import os
+
+        self.left_video_path = "airobo_trainer/assets/videos/l_hand.mp4"
+        self.right_video_path = "airobo_trainer/assets/videos/r_hand.mp4"
+
+        # Check if video files exist
+        self.left_video_exists = os.path.exists(self.left_video_path)
+        self.right_video_exists = os.path.exists(self.right_video_path)
+
     def _create_center_content(self):
         """Create center content with video area."""
         widget = QWidget()
@@ -360,27 +631,81 @@ class VideoExperimentView(BaseExperimentView):
             }
         """)
 
-        # Video display area that will be resized dynamically when video is added
-        self.video_label = QLabel("Video Area\n(Video will be played here)")
-        self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.video_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.video_label.setMinimumSize(200, 150)
-        self.video_label.setStyleSheet("""
+        layout = QVBoxLayout(widget)
+
+        # Create video player and widget
+        self.video_player = QMediaPlayer()
+        self.video_widget = QVideoWidget()
+        self.video_player.setVideoOutput(self.video_widget)
+        self.video_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.video_widget.setMinimumSize(400, 500)  # Ensure minimum size
+        self.video_widget.show()  # Ensure the widget is visible
+        self.video_widget.repaint()  # Force repaint
+
+        # Set up video player for looping and debugging
+        self.video_player.mediaStatusChanged.connect(self._on_media_status_changed)
+        self.video_player.errorOccurred.connect(self._on_video_error)
+        self.video_player.playbackStateChanged.connect(self._on_playback_state_changed)
+
+        # Bottom text label for arm indication
+        self.arm_label = QLabel("Left Arm")
+        self.arm_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.arm_label.setStyleSheet("""
             QLabel {
-                background-color: #111;
-                border: 1px solid #444;
-                border-radius: 3px;
-                color: #fff;
-                font-size: 14px;
+                background-color: #add8e6;
+                color: #000;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 8px;
+                border-radius: 5px;
+                margin: 5px;
             }
         """)
+        self.arm_label.setMaximumHeight(40)
 
-        layout = QVBoxLayout(widget)
-        layout.addWidget(self.video_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.video_widget, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.arm_label, alignment=Qt.AlignmentFlag.AlignBottom)
 
         # Store widget reference for resize handling
         widget.video_widget = self
         return widget
+
+    def _show_left_hand_content(self):
+        """Show left hand video."""
+        if self.left_video_exists:
+            self.video_player.setSource(QUrl.fromLocalFile(self.left_video_path))
+            self.video_widget.update()  # Force refresh
+            self.video_player.play()
+        self.arm_label.setText("Left Arm")
+
+    def _show_right_hand_content(self):
+        """Show right hand video."""
+        if self.right_video_exists:
+            self.video_player.setSource(QUrl.fromLocalFile(self.right_video_path))
+            self.video_widget.update()  # Force refresh
+            self.video_player.play()
+        self.arm_label.setText("Right Arm")
+
+    def _show_relax_content(self):
+        """Show relax state."""
+        self.video_player.stop()
+        self.arm_label.setText("Relax")
+
+    def _on_media_status_changed(self, status):
+        """Handle media status changes for looping videos."""
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            # Loop the video
+            self.video_player.setPosition(0)
+            self.video_player.play()
+
+    def _on_video_error(self, error, error_string):
+        """Handle video playback errors."""
+        print(f"Video error: {error} - {error_string}")
+        # Could show an error message to the user here
+
+    def _on_playback_state_changed(self, state):
+        """Handle playback state changes - no debug output."""
+        pass  # Removed debug output as requested
 
     def set_video_content(self, video_path_or_content):
         """

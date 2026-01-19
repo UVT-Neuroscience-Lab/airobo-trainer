@@ -5,6 +5,7 @@ Unit tests for Experiment Views
 import pytest
 from pytestqt.qtbot import QtBot
 from PyQt6.QtWidgets import QPushButton, QLabel
+from PyQt6.QtCore import Qt
 
 from airobo_trainer.views.experiment_views import (
     MuscleBar,
@@ -78,6 +79,7 @@ class TestBaseExperimentView:
         assert base_view.windowTitle() == "AiRobo-Trainer - Test Experiment"
         assert base_view.left_arm_bar is not None
         assert base_view.right_arm_bar is not None
+        assert base_view.current_mode == "relax"
 
     def test_back_button_signal(self, base_view, qtbot):
         """Test back button emits signal."""
@@ -101,6 +103,50 @@ class TestBaseExperimentView:
 
         # Test invalid arm (should not crash)
         base_view.update_muscle_activation("invalid", 0, 50)
+
+    def test_set_simulation_mode(self, base_view):
+        """Test setting simulation modes."""
+        # Test left mode
+        base_view.set_simulation_mode("left")
+        assert base_view.current_mode == "left"
+
+        # Test right mode
+        base_view.set_simulation_mode("right")
+        assert base_view.current_mode == "right"
+
+        # Test relax mode
+        base_view.set_simulation_mode("relax")
+        assert base_view.current_mode == "relax"
+
+    def test_resize_event(self, base_view):
+        """Test resize event handling."""
+
+        # Resize the view
+        base_view.resize(1000, 800)
+
+        # Check that spacers were updated (this tests the resizeEvent logic)
+        # The exact values depend on the window width, but they should be non-zero
+        assert base_view._center_spacer.width() > 0
+        assert base_view._right_spacer.width() > 0
+
+    def test_key_press_events(self, base_view, qtbot):
+        """Test keyboard shortcuts for simulation."""
+        # Test key 1 (left hand)
+        qtbot.keyPress(base_view, Qt.Key.Key_1)
+        assert base_view.current_mode == "left"
+
+        # Test key 2 (right hand)
+        qtbot.keyPress(base_view, Qt.Key.Key_2)
+        assert base_view.current_mode == "right"
+
+        # Test key 3 (relax)
+        qtbot.keyPress(base_view, Qt.Key.Key_3)
+        assert base_view.current_mode == "relax"
+
+    def test_set_status(self, base_view):
+        """Test setting status (for controller compatibility)."""
+        base_view.set_status("Test Status")
+        assert base_view.status_label.text() == "Test Status"
 
 
 class TestTextCommandsExperimentView:
@@ -130,7 +176,7 @@ class TestTextCommandsExperimentView:
 
         assert text_label is not None
         assert "Command: RELAX" in text_label.text()
-        assert "Please follow the voice instructions" in text_label.text()
+        assert "Please follow the instructions" in text_label.text()
 
 
 class TestAvatarExperimentView:
@@ -149,22 +195,49 @@ class TestAvatarExperimentView:
         assert avatar_view.center_content is not None
 
     def test_center_content_has_placeholder(self, avatar_view):
-        """Test that center content contains avatar image."""
+        """Test that center content contains avatar area and arm label."""
         labels = avatar_view.center_content.findChildren(QLabel)
         avatar_label = None
-        for label in labels:
-            avatar_label = label
-            break
+        arm_label = None
 
+        for label in labels:
+            if hasattr(label, "text") and "Relax" in label.text():
+                arm_label = label
+            elif avatar_label is None:  # First label is avatar label
+                avatar_label = label
+
+        # Avatar should start in relax mode (no image, just arm label)
         assert avatar_label is not None
-        # Check if pixmap is set (image loaded) or fallback text is shown
-        if avatar_label.pixmap() is not None:
-            # Image was loaded successfully
-            assert avatar_label.pixmap().isNull() is False
-        else:
-            # Fallback text is shown
-            assert "Avatar Image" in avatar_label.text()
-            assert "l_hand.png" in avatar_label.text()
+        assert arm_label is not None
+        assert "Relax" in arm_label.text()
+        # In relax mode, avatar should not have a pixmap (image cleared)
+        assert avatar_label.pixmap() is None or avatar_label.pixmap().isNull()
+
+    def test_show_left_hand_content(self, avatar_view):
+        """Test showing left hand avatar content."""
+        avatar_view._show_left_hand_content()
+        # Check that arm label was updated
+        assert "Left Arm" in avatar_view.arm_label.text()
+
+    def test_show_right_hand_content(self, avatar_view):
+        """Test showing right hand avatar content."""
+        avatar_view._show_right_hand_content()
+        # Check that arm label was updated
+        assert "Right Arm" in avatar_view.arm_label.text()
+
+    def test_show_relax_content(self, avatar_view):
+        """Test showing relax avatar content."""
+        # First set to left hand
+        avatar_view._show_left_hand_content()
+        assert "Left Arm" in avatar_view.arm_label.text()
+
+        # Then set to relax
+        avatar_view._show_relax_content()
+        assert "Relax" in avatar_view.arm_label.text()
+        # Avatar should be cleared
+        assert (
+            avatar_view.avatar_label.pixmap() is None or avatar_view.avatar_label.pixmap().isNull()
+        )
 
 
 class TestVideoExperimentView:
@@ -183,14 +256,52 @@ class TestVideoExperimentView:
         assert video_view.center_content is not None
 
     def test_center_content_has_placeholder(self, video_view):
-        """Test that center content contains video placeholder."""
+        """Test that center content contains video player and arm label."""
+        # Check that video player and widget exist
+        assert hasattr(video_view, "video_player")
+        assert hasattr(video_view, "video_widget")
+        assert video_view.video_player is not None
+        assert video_view.video_widget is not None
+
+        # Check that arm label exists and has correct initial text
         labels = video_view.center_content.findChildren(QLabel)
-        placeholder_label = None
+        arm_label = None
         for label in labels:
-            if hasattr(label, "text"):
-                placeholder_label = label
+            if hasattr(label, "text") and "Left Arm" in label.text():
+                arm_label = label
                 break
 
-        assert placeholder_label is not None
-        assert "Video Area" in placeholder_label.text()
-        assert "Video will be played here" in placeholder_label.text()
+        assert arm_label is not None
+        assert "Left Arm" in arm_label.text()
+
+    def test_show_left_hand_content(self, video_view):
+        """Test showing left hand video content."""
+        video_view._show_left_hand_content()
+        # Check that arm label was updated
+        assert "Left Arm" in video_view.arm_label.text()
+
+    def test_show_right_hand_content(self, video_view):
+        """Test showing right hand video content."""
+        video_view._show_right_hand_content()
+        # Check that arm label was updated
+        assert "Right Arm" in video_view.arm_label.text()
+
+    def test_show_relax_content(self, video_view):
+        """Test showing relax video content."""
+        # First set to left hand
+        video_view._show_left_hand_content()
+        assert "Left Arm" in video_view.arm_label.text()
+
+        # Then set to relax
+        video_view._show_relax_content()
+        assert "Relax" in video_view.arm_label.text()
+
+    def test_video_preloading(self, video_view):
+        """Test that video files are preloaded on initialization."""
+        assert hasattr(video_view, "left_video_path")
+        assert hasattr(video_view, "right_video_path")
+        assert hasattr(video_view, "left_video_exists")
+        assert hasattr(video_view, "right_video_exists")
+        # Check that paths contain expected video files
+        assert "l_hand.mp4" in video_view.left_video_path
+        assert "r_hand.mp4" in video_view.right_video_path
