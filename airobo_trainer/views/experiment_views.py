@@ -517,12 +517,12 @@ class AvatarExperimentView(BaseExperimentView):
                 color: #000;
                 font-size: 16px;
                 font-weight: bold;
-                padding: 8px;
+                padding: 12px;
                 border-radius: 5px;
                 margin: 5px;
             }
         """)
-        self.arm_label.setMaximumHeight(40)
+        self.arm_label.setMaximumHeight(60)
 
         # Start in relax mode - no initial image
         self.arm_label.setText("Relax")
@@ -656,12 +656,12 @@ class VideoExperimentView(BaseExperimentView):
                 color: #000;
                 font-size: 16px;
                 font-weight: bold;
-                padding: 8px;
+                padding: 12px;
                 border-radius: 5px;
                 margin: 5px;
             }
         """)
-        self.arm_label.setMaximumHeight(40)
+        self.arm_label.setMaximumHeight(60)
 
         layout.addWidget(self.video_widget, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.arm_label, alignment=Qt.AlignmentFlag.AlignBottom)
