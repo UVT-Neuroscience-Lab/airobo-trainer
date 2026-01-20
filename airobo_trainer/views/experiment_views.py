@@ -22,7 +22,8 @@ from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QPixmap
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
-from airobo_trainer.models.bci_core import BCIEngine
+from airobo_trainer.models.bci_core import BCIEngine, AttentionCalculator
+from airobo_trainer.views.experiment_config_view import ExperimentConfigView
 
 
 class BCIWorker(QThread):
@@ -269,6 +270,18 @@ class BaseExperimentView(QMainWindow):
         self.bci_worker = None
         self.is_recording = False
 
+        # Attention calculator for real-time intention detection
+        sampling_rate = int(self.bci_config.get("sampling_rate", "250 Hz").split()[0])
+        self.attention_calculator = AttentionCalculator(sampling_rate)
+
+        # Check if motor cortex electrodes (C3, CZ, C4) are selected for attention calculation
+        selected_electrodes = self.bci_config.get("selected_electrodes", {14, 15, 16})
+        self.has_motor_electrodes = {14, 15, 16}.issubset(selected_electrodes)  # C3, CZ, C4 indices
+
+        # Attention update timer
+        self.attention_timer = QTimer()
+        self.attention_timer.timeout.connect(self._update_attention_bars)
+
         self._init_ui()
         # Start with relax oscillation
         self._start_gradual_transition("relax")
@@ -417,6 +430,9 @@ class BaseExperimentView(QMainWindow):
         try:
             output_path = self.bci_config.get("output_path", "airobo_trainer/output")
             self.bci_worker = BCIWorker(output_path, self.bci_config)
+            # Connect BCI data to attention calculator if motor electrodes are available
+            if self.has_motor_electrodes:
+                self.bci_worker.data_received.connect(self._on_bci_data_received)
             self.bci_worker.start()
             self.is_recording = True
             self.start_test_button.setText("End Test")
@@ -437,12 +453,48 @@ class BaseExperimentView(QMainWindow):
                     background-color: #B71C1C;
                 }
             """)
-            print("BCI recording started")
+            # Start attention calculation if motor electrodes are available
+            if self.has_motor_electrodes:
+                self.attention_timer.start(100)  # Update every 100ms
+                print("BCI recording started with attention calculation")
+            else:
+                print("BCI recording started (no motor electrodes for attention calculation)")
         except Exception as e:
             print(f"Failed to start BCI recording: {e}")
 
+    def _on_bci_data_received(self, data_block):
+        """Handle incoming BCI data for attention calculation."""
+        if self.has_motor_electrodes and len(data_block) > 0:
+            # Convert data block to the expected format [C3, CZ, C4]
+            # Assuming the data comes in order of selected electrodes
+            if len(data_block[0]) >= 3:
+                # Take the first sample from the block and feed to attention calculator
+                eeg_sample = data_block[0][:3]  # First 3 values (C3, CZ, C4)
+                self.attention_calculator.add_sample(eeg_sample)
+
+    def _update_attention_bars(self):
+        """Update muscle bars based on calculated attention levels."""
+        if not self.has_motor_electrodes or not self.is_recording:
+            return
+
+        # Get current attention levels
+        left_attention, right_attention = self.attention_calculator.calculate_attention()
+
+        # Update muscle bars based on attention levels
+        # Map 0-100 attention to muscle activation levels
+        for i in range(6):
+            # Calculate activation for each segment based on attention level
+            left_level = min(100, max(0, int((left_attention - i * 16.7) * 6)))
+            right_level = min(100, max(0, int((right_attention - i * 16.7) * 6)))
+
+            self.left_arm_bar.set_activation(i, left_level)
+            self.right_arm_bar.set_activation(i, right_level)
+
     def _stop_recording(self):
         """Stop BCI recording."""
+        # Stop attention timer
+        self.attention_timer.stop()
+
         if self.bci_worker:
             self.bci_worker.stop_recording()
             self.bci_worker = None
@@ -495,43 +547,47 @@ class BaseExperimentView(QMainWindow):
 
     def _start_gradual_transition(self, target_mode: str):
         """Start a gradual transition to the target oscillation pattern."""
-        # Stop any existing transitions
-        self.transition_timer.stop()
-        self.oscillation_timer.stop()
+        # COMMENTED OUT: Transition code disabled - only attention calculation should affect bars
+        # # Stop any existing transitions
+        # self.transition_timer.stop()
+        # self.oscillation_timer.stop()
+        #
+        # # Set current levels as starting point
+        # self.current_left_levels = [self.left_arm_bar.activation_levels[i] for i in range(6)]
+        # self.current_right_levels = [self.right_arm_bar.activation_levels[i] for i in range(6)]
+        #
+        # # Calculate target levels based on mode
+        # if target_mode == "left":
+        #     # Left hand active: 53-87%, Right hand inactive: 6-18%
+        #     left_activation = 70  # Average target
+        #     right_activation = 12  # Average target
+        # elif target_mode == "right":
+        #     # Right hand active: 53-87%, Left hand inactive: 6-18%
+        #     right_activation = 70  # Average target
+        #     left_activation = 12  # Average target
+        # elif target_mode == "relax":
+        #     # Both arms oscillating: 12-34%
+        #     left_activation = 23  # Average target
+        #     right_activation = 23  # Average target
+        # else:
+        #     return
+        #
+        # # Calculate target levels for each bar segment
+        # self.target_left_levels = []
+        # self.target_right_levels = []
+        # for i in range(6):
+        #     left_level = min(100, max(0, int((left_activation - i * 16.7) * 6)))
+        #     right_level = min(100, max(0, int((right_activation - i * 16.7) * 6)))
+        #     self.target_left_levels.append(left_level)
+        #     self.target_right_levels.append(right_level)
+        #
+        # # Start the gradual transition
+        # self.transition_progress = 0.0
+        # self.transitioning = True
+        # self.transition_timer.start(50)  # Update every 50ms for smooth transition
 
-        # Set current levels as starting point
-        self.current_left_levels = [self.left_arm_bar.activation_levels[i] for i in range(6)]
-        self.current_right_levels = [self.right_arm_bar.activation_levels[i] for i in range(6)]
-
-        # Calculate target levels based on mode
-        if target_mode == "left":
-            # Left hand active: 53-87%, Right hand inactive: 6-18%
-            left_activation = 70  # Average target
-            right_activation = 12  # Average target
-        elif target_mode == "right":
-            # Right hand active: 53-87%, Left hand inactive: 6-18%
-            right_activation = 70  # Average target
-            left_activation = 12  # Average target
-        elif target_mode == "relax":
-            # Both arms oscillating: 12-34%
-            left_activation = 23  # Average target
-            right_activation = 23  # Average target
-        else:
-            return
-
-        # Calculate target levels for each bar segment
-        self.target_left_levels = []
-        self.target_right_levels = []
-        for i in range(6):
-            left_level = min(100, max(0, int((left_activation - i * 16.7) * 6)))
-            right_level = min(100, max(0, int((right_activation - i * 16.7) * 6)))
-            self.target_left_levels.append(left_level)
-            self.target_right_levels.append(right_level)
-
-        # Start the gradual transition
-        self.transition_progress = 0.0
-        self.transitioning = True
-        self.transition_timer.start(50)  # Update every 50ms for smooth transition
+        # Keep empty - no transitions, only attention calculation affects bars
+        pass
 
     def _update_transition(self):
         """Update the gradual transition between oscillation patterns."""
@@ -584,31 +640,35 @@ class BaseExperimentView(QMainWindow):
 
     def _update_muscle_bars(self):
         """Update muscle bar activations with oscillating values."""
-        import random
+        # COMMENTED OUT: Oscillation simulation code disabled for testing
+        # import random
+        #
+        # if self.current_mode == "left":
+        #     # Left hand active: 53-87%, Right hand inactive: 6-18%
+        #     left_activation = random.randint(53, 87)
+        #     right_activation = random.randint(6, 18)
+        # elif self.current_mode == "right":
+        #     # Right hand active: 53-87%, Left hand inactive: 6-18%
+        #     right_activation = random.randint(53, 87)
+        #     left_activation = random.randint(6, 18)
+        # elif self.current_mode == "relax":
+        #     # Both arms oscillating: 12-34%
+        #     left_activation = random.randint(12, 34)
+        #     right_activation = random.randint(12, 34)
+        # else:
+        #     return
+        #
+        # # Fill bars from bottom to top based on activation level
+        # # Each bar represents ~16.7% of total activation
+        # for i in range(6):
+        #     left_level = min(100, max(0, int((left_activation - i * 16.7) * 6)))
+        #     right_level = min(100, max(0, int((right_activation - i * 16.7) * 6)))
+        #
+        #     self.left_arm_bar.set_activation(i, left_level)
+        #     self.right_arm_bar.set_activation(i, right_level)
 
-        if self.current_mode == "left":
-            # Left hand active: 53-87%, Right hand inactive: 6-18%
-            left_activation = random.randint(53, 87)
-            right_activation = random.randint(6, 18)
-        elif self.current_mode == "right":
-            # Right hand active: 53-87%, Left hand inactive: 6-18%
-            right_activation = random.randint(53, 87)
-            left_activation = random.randint(6, 18)
-        elif self.current_mode == "relax":
-            # Both arms oscillating: 12-34%
-            left_activation = random.randint(12, 34)
-            right_activation = random.randint(12, 34)
-        else:
-            return
-
-        # Fill bars from bottom to top based on activation level
-        # Each bar represents ~16.7% of total activation
-        for i in range(6):
-            left_level = min(100, max(0, int((left_activation - i * 16.7) * 6)))
-            right_level = min(100, max(0, int((right_activation - i * 16.7) * 6)))
-
-            self.left_arm_bar.set_activation(i, left_level)
-            self.right_arm_bar.set_activation(i, right_level)
+        # Keep empty for now - attention calculation will handle updates during recording
+        pass
 
     def update_muscle_activation(self, arm: str, segment: int, level: int):
         """
@@ -635,6 +695,13 @@ class TextCommandsExperimentView(BaseExperimentView):
     Shows text commands with background in the center.
     """
 
+    def __init__(self, experiment_name: str, bci_config: dict = None, config_view: ExperimentConfigView = None):
+        # Store reference to config view for temp asset access
+        self.config_view = config_view
+        # Load experiment configuration
+        self.experiment_config = config_view._load_config() if config_view else ExperimentConfigView.get_experiment_config()
+        super().__init__(experiment_name, bci_config)
+
     def _create_center_content(self):
         """Create center content with text display."""
         widget = QWidget()
@@ -655,7 +722,10 @@ class TextCommandsExperimentView(BaseExperimentView):
 
         # Text display area with word wrapping
         self.text_label = QLabel(
-            "Command: RELAX\n\nPlease follow the instructions to control the system using your thoughts."
+            self.experiment_config.get(
+                "relax_text",
+                "Command: RELAX\n\nPlease follow the instructions to control the system using your thoughts.",
+            )
         )
         self.text_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.text_label.setWordWrap(True)  # Enable word wrapping
@@ -672,21 +742,27 @@ class TextCommandsExperimentView(BaseExperimentView):
 
     def _show_left_hand_content(self):
         """Show left hand command."""
-        self.text_label.setText(
-            "LEFT HAND\n\nImagine moving your left hand.\nFocus on the movement and muscle activation."
+        text = self.experiment_config.get(
+            "left_text",
+            "LEFT HAND\n\nImagine moving your left hand.\nFocus on the movement and muscle activation.",
         )
+        self.text_label.setText(text)
 
     def _show_right_hand_content(self):
         """Show right hand command."""
-        self.text_label.setText(
-            "RIGHT HAND\n\nImagine moving your right hand.\nFocus on the movement and muscle activation."
+        text = self.experiment_config.get(
+            "right_text",
+            "RIGHT HAND\n\nImagine moving your right hand.\nFocus on the movement and muscle activation.",
         )
+        self.text_label.setText(text)
 
     def _show_relax_content(self):
         """Show relax command."""
-        self.text_label.setText(
-            "Command: RELAX\n\nPlease follow the instructions to control the system using your thoughts."
+        text = self.experiment_config.get(
+            "relax_text",
+            "Command: RELAX\n\nPlease follow the instructions to control the system using your thoughts.",
         )
+        self.text_label.setText(text)
 
 
 class AvatarExperimentView(BaseExperimentView):
@@ -694,6 +770,15 @@ class AvatarExperimentView(BaseExperimentView):
     Experiment view for Avatar training.
     Shows placeholder for avatar image in the center.
     """
+
+    def __init__(self, experiment_name: str, bci_config: dict = None, config_view: ExperimentConfigView = None):
+        # Load experiment configuration with full paths
+        self.experiment_config = ExperimentConfigView.get_experiment_config()
+        super().__init__(experiment_name, bci_config)
+        # Initialize to relax state
+        self._show_relax_content()
+
+
 
     def _create_center_content(self):
         """Create center content with avatar image."""
@@ -722,7 +807,7 @@ class AvatarExperimentView(BaseExperimentView):
         self.avatar_label.setFixedSize(400, 500)  # Fixed size to prevent collapse
 
         # Bottom text label for arm indication
-        self.arm_label = QLabel("Left Arm")
+        self.arm_label = QLabel("Relax")
         self.arm_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.arm_label.setStyleSheet("""
             QLabel {
@@ -737,9 +822,6 @@ class AvatarExperimentView(BaseExperimentView):
         """)
         self.arm_label.setMaximumHeight(60)
 
-        # Start in relax mode - no initial image
-        self.arm_label.setText("Relax")
-
         layout.addWidget(self.avatar_label, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.arm_label, alignment=Qt.AlignmentFlag.AlignBottom)
 
@@ -749,21 +831,41 @@ class AvatarExperimentView(BaseExperimentView):
 
     def _load_avatar_image(self, hand: str):
         """Load the appropriate avatar image for the specified hand."""
+        # Get the image path from config
         if hand == "left":
-            image_path = "airobo_trainer/assets/images/l_hand.png"
+            image_path = self.experiment_config.get("left_avatar", "l_hand.png")
         elif hand == "right":
-            image_path = "airobo_trainer/assets/images/r_hand.png"
+            image_path = self.experiment_config.get("right_avatar", "r_hand.png")
+        elif hand == "relax":
+            image_path = self.experiment_config.get("relax_avatar", "")
         else:
-            image_path = "airobo_trainer/assets/images/l_hand.png"  # Default
+            image_path = ""
 
-        self.original_pixmap = QPixmap(image_path)
-        if not self.original_pixmap.isNull():
-            # Immediately scale to fit available space
-            self._scale_avatar_image()
-        else:
-            # Fallback if image can't be loaded
-            self.avatar_label.setText(f"Avatar Image\n(Could not load {image_path})")
-            self.avatar_label.setStyleSheet("font-size: 14px; color: #666;")
+        # If it's just a filename (no path), assume it's in project assets
+        if image_path and not os.path.isabs(image_path):
+            if image_path == "l_hand.png":
+                image_path = "airobo_trainer/assets/images/l_hand.png"
+            elif image_path == "r_hand.png":
+                image_path = "airobo_trainer/assets/images/r_hand.png"
+            else:
+                image_path = f"airobo_trainer/assets/images/{image_path}"
+
+        if image_path and os.path.exists(image_path):
+            pixmap = QPixmap(image_path)
+            if not pixmap.isNull():
+                # Scale to fit while maintaining aspect ratio
+                label_size = self.avatar_label.size()
+                if label_size.width() > 50 and label_size.height() > 50:
+                    scaled_pixmap = pixmap.scaled(
+                        label_size,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    self.avatar_label.setPixmap(scaled_pixmap)
+                    return
+
+        # No valid image found
+        self.avatar_label.clear()
 
     def _show_left_hand_content(self):
         """Show left hand avatar."""
@@ -776,32 +878,16 @@ class AvatarExperimentView(BaseExperimentView):
         self.arm_label.setText("Right Arm")
 
     def _show_relax_content(self):
-        """Show relax state - clear avatar image and update label."""
-        self.avatar_label.clear()  # Clear the image
+        """Show relax state."""
+        self._load_avatar_image("relax")
         self.arm_label.setText("Relax")
-
-    def _scale_avatar_image(self):
-        """Scale the avatar image to fit the available space."""
-        if hasattr(self, "original_pixmap") and not self.original_pixmap.isNull():
-            # Get the size of the avatar label
-            label_size = self.avatar_label.size()
-            if (
-                label_size.width() > 50 and label_size.height() > 50
-            ):  # Ensure we have valid dimensions
-                # Scale to fit while maintaining aspect ratio
-                scaled_pixmap = self.original_pixmap.scaled(
-                    label_size,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-                self.avatar_label.setPixmap(scaled_pixmap)
 
     def resizeEvent(self, event):
         """Handle window resize to rescale avatar image."""
         super().resizeEvent(event)
-        # Rescale the avatar image when the window resizes
-        if hasattr(self, "_scale_avatar_image"):
-            self._scale_avatar_image()
+        # Reload current image with new size
+        current_mode = getattr(self, 'current_mode', 'relax')
+        self._load_avatar_image(current_mode)
 
 
 class VideoExperimentView(BaseExperimentView):
@@ -810,23 +896,14 @@ class VideoExperimentView(BaseExperimentView):
     Shows video area in the center, ready for video playback.
     """
 
-    def __init__(self, experiment_name: str, bci_config: dict = None):
-        # Preload videos for seamless switching
-        self._preload_videos()
+    def __init__(self, experiment_name: str, bci_config: dict = None, config_view: ExperimentConfigView = None):
+        # Load experiment configuration with full paths
+        self.experiment_config = ExperimentConfigView.get_experiment_config()
         super().__init__(experiment_name, bci_config)
+        # Initialize to relax state
+        self._show_relax_content()
 
-    def _preload_videos(self):
-        """Preload video files for seamless playback switching."""
-        # For now, just check if files exist and store paths
-        # In a real implementation, this would load video data into memory
-        import os
 
-        self.left_video_path = "airobo_trainer/assets/videos/l_hand.mp4"
-        self.right_video_path = "airobo_trainer/assets/videos/r_hand.mp4"
-
-        # Check if video files exist
-        self.left_video_exists = os.path.exists(self.left_video_path)
-        self.right_video_exists = os.path.exists(self.right_video_path)
 
     def _create_center_content(self):
         """Create center content with video area."""
@@ -861,7 +938,7 @@ class VideoExperimentView(BaseExperimentView):
         self.video_player.playbackStateChanged.connect(self._on_playback_state_changed)
 
         # Bottom text label for arm indication
-        self.arm_label = QLabel("Left Arm")
+        self.arm_label = QLabel("Relax")
         self.arm_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.arm_label.setStyleSheet("""
             QLabel {
@@ -885,23 +962,52 @@ class VideoExperimentView(BaseExperimentView):
 
     def _show_left_hand_content(self):
         """Show left hand video."""
-        if self.left_video_exists:
-            self.video_player.setSource(QUrl.fromLocalFile(self.left_video_path))
+        video_path = self.experiment_config.get("left_video", "l_hand.mp4")
+
+        # If it's just a filename (no path), assume it's in project assets
+        if video_path and not os.path.isabs(video_path):
+            if video_path == "l_hand.mp4":
+                video_path = "airobo_trainer/assets/videos/l_hand.mp4"
+            else:
+                video_path = f"airobo_trainer/assets/videos/{video_path}"
+
+        if video_path and os.path.exists(video_path):
+            self.video_player.setSource(QUrl.fromLocalFile(video_path))
             self.video_widget.update()  # Force refresh
             self.video_player.play()
         self.arm_label.setText("Left Arm")
 
     def _show_right_hand_content(self):
         """Show right hand video."""
-        if self.right_video_exists:
-            self.video_player.setSource(QUrl.fromLocalFile(self.right_video_path))
+        video_path = self.experiment_config.get("right_video", "r_hand.mp4")
+
+        # If it's just a filename (no path), assume it's in project assets
+        if video_path and not os.path.isabs(video_path):
+            if video_path == "r_hand.mp4":
+                video_path = "airobo_trainer/assets/videos/r_hand.mp4"
+            else:
+                video_path = f"airobo_trainer/assets/videos/{video_path}"
+
+        if video_path and os.path.exists(video_path):
+            self.video_player.setSource(QUrl.fromLocalFile(video_path))
             self.video_widget.update()  # Force refresh
             self.video_player.play()
         self.arm_label.setText("Right Arm")
 
     def _show_relax_content(self):
         """Show relax state."""
-        self.video_player.stop()
+        video_path = self.experiment_config.get("relax_video", "")
+
+        # If it's just a filename (no path), assume it's in project assets
+        if video_path and not os.path.isabs(video_path):
+            video_path = f"airobo_trainer/assets/videos/{video_path}"
+
+        if video_path and os.path.exists(video_path):
+            self.video_player.setSource(QUrl.fromLocalFile(video_path))
+            self.video_widget.update()  # Force refresh
+            self.video_player.play()
+        else:
+            self.video_player.stop()
         self.arm_label.setText("Relax")
 
     def _on_media_status_changed(self, status):

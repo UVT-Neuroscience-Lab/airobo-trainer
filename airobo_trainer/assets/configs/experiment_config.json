@@ -1,0 +1,11 @@
+{
+  "left_text": "LEFT HAND\n\nImagine moving your left hand.\nFocus on the movement and muscle activation.",
+  "right_text": "RIGHT HAND\n\nImagine moving your right hand.\nFocus on the movement and muscle activation.",
+  "relax_text": "Command: RELAX\n\nPlease follow the instructions to control the system using your thoughts.",
+  "left_avatar": "C:/Users/bcilab/BCI_Test/Relu/airobo-trainer/airobo_trainer/assets/images/l_hand.png",
+  "right_avatar": "C:/Users/bcilab/BCI_Test/Relu/airobo-trainer/airobo_trainer/assets/images/r_hand.png",
+  "relax_avatar": "",
+  "left_video": "C:/Users/bcilab/BCI_Test/Relu/airobo-trainer/airobo_trainer/assets/videos/l_hand.mp4",
+  "right_video": "C:/Users/bcilab/BCI_Test/Relu/airobo-trainer/airobo_trainer/assets/videos/r_hand.mp4",
+  "relax_video": ""
+}

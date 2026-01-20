@@ -158,7 +158,9 @@ class TestTextCommandsExperimentView:
     @pytest.fixture
     def text_view(self, qtbot: QtBot):
         """Create a TextCommandsExperimentView instance for testing."""
-        view = TextCommandsExperimentView("Text Commands")
+        from airobo_trainer.views.experiment_config_view import ExperimentConfigView
+        config_view = ExperimentConfigView()
+        view = TextCommandsExperimentView("Text Commands", config_view=config_view)
         qtbot.addWidget(view)
         return view
 
@@ -178,8 +180,14 @@ class TestTextCommandsExperimentView:
                 break
 
         assert text_label is not None
-        assert "Command: RELAX" in text_label.text()
-        assert "Please follow the instructions" in text_label.text()
+        # Check that it contains relax text (either from config or default)
+        text_content = text_label.text().upper()
+        assert "RELAX" in text_content
+        assert "PLEASE" in text_content or "FOLLOW" in text_content
+
+    def test_initial_relax_state(self, text_view):
+        """Test that experiment views start in relax state."""
+        assert text_view.current_mode == "relax"
 
 
 class TestAvatarExperimentView:
@@ -188,7 +196,9 @@ class TestAvatarExperimentView:
     @pytest.fixture
     def avatar_view(self, qtbot: QtBot):
         """Create an AvatarExperimentView instance for testing."""
-        view = AvatarExperimentView("Avatar")
+        from airobo_trainer.views.experiment_config_view import ExperimentConfigView
+        config_view = ExperimentConfigView()
+        view = AvatarExperimentView("Avatar", config_view=config_view)
         qtbot.addWidget(view)
         return view
 
@@ -249,7 +259,9 @@ class TestVideoExperimentView:
     @pytest.fixture
     def video_view(self, qtbot: QtBot):
         """Create a VideoExperimentView instance for testing."""
-        view = VideoExperimentView("Video")
+        from airobo_trainer.views.experiment_config_view import ExperimentConfigView
+        config_view = ExperimentConfigView()
+        view = VideoExperimentView("Video", config_view=config_view)
         qtbot.addWidget(view)
         return view
 
@@ -270,12 +282,12 @@ class TestVideoExperimentView:
         labels = video_view.center_content.findChildren(QLabel)
         arm_label = None
         for label in labels:
-            if hasattr(label, "text") and "Left Arm" in label.text():
+            if hasattr(label, "text") and "Relax" in label.text():
                 arm_label = label
                 break
 
         assert arm_label is not None
-        assert "Left Arm" in arm_label.text()
+        assert "Relax" in arm_label.text()
 
     def test_show_left_hand_content(self, video_view):
         """Test showing left hand video content."""
@@ -343,9 +355,7 @@ class TestBCIWorker:
         assert len(bci_worker.raw_samples) == 1
 
         # Test stop recording
-        with patch("os.makedirs"), patch("builtins.open", mock_open()), patch(
-            "csv.writer"
-        ):
+        with patch("os.makedirs"), patch("builtins.open", mock_open()), patch("csv.writer"):
             bci_worker.stop_recording()
             assert bci_worker._running is False
 

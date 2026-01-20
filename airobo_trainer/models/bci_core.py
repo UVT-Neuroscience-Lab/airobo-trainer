@@ -9,6 +9,105 @@ import threading
 import csv
 import os
 from datetime import datetime
+from scipy import signal
+
+
+class AttentionCalculator:
+    """
+    Simplified attention/intention calculator based on motor cortex activity.
+
+    Calculates left/right hand intention from 0-100 based on EEG band power analysis.
+    """
+
+    def __init__(self, sampling_rate=500):
+        self.fs = sampling_rate
+        self.buffer_size = 1000  # 2 seconds at 500Hz
+        self.left_buffer = []
+        self.right_buffer = []
+        self.center_buffer = []
+
+    def add_sample(self, eeg_data):
+        """
+        Add new EEG sample for attention calculation.
+
+        Args:
+            eeg_data: List/array of electrode values in order [C3, CZ, C4]
+        """
+        if len(eeg_data) >= 3:
+            self.left_buffer.append(float(eeg_data[0]))  # C3
+            self.center_buffer.append(float(eeg_data[1]))  # CZ
+            self.right_buffer.append(float(eeg_data[2]))  # C4
+
+            # Keep buffer size limited
+            if len(self.left_buffer) > self.buffer_size:
+                self.left_buffer.pop(0)
+                self.center_buffer.pop(0)
+                self.right_buffer.pop(0)
+
+    def calculate_attention(self):
+        """
+        Calculate attention/intention levels for left and right hands.
+
+        Returns:
+            tuple: (left_attention, right_attention) - values from 0-100
+        """
+        if len(self.left_buffer) < 100:  # Need minimum data
+            return 50, 50  # Neutral
+
+        try:
+            # Calculate band power in mu (8-12 Hz) and beta (13-30 Hz) bands
+            left_power = self._calculate_motor_power(self.left_buffer)
+            right_power = self._calculate_motor_power(self.right_buffer)
+
+            # Calculate laterality index (relative power difference)
+            # Positive = right intention, Negative = left intention
+            if left_power + right_power > 0:
+                laterality = (right_power - left_power) / (left_power + right_power)
+            else:
+                laterality = 0
+
+            # Convert to 0-100 scale
+            # laterality ranges from -1 to 1, convert to 0-100 where:
+            # 0 = strong left intention, 50 = neutral, 100 = strong right intention
+            left_attention = max(0, min(100, 50 - (laterality * 50)))
+            right_attention = max(0, min(100, 50 + (laterality * 50)))
+
+            return int(left_attention), int(right_attention)
+
+        except Exception as e:
+            print(f"Attention calculation error: {e}")
+            return 50, 50
+
+    def _calculate_motor_power(self, eeg_buffer):
+        """
+        Calculate motor cortex band power (mu + beta bands).
+
+        Args:
+            eeg_buffer: List of EEG samples
+
+        Returns:
+            float: Band power value
+        """
+        if len(eeg_buffer) < 100:
+            return 0
+
+        # Convert to numpy array
+        data = np.array(eeg_buffer)
+
+        # Design bandpass filter for mu (8-12 Hz) and beta (13-30 Hz) bands
+        # Combined as motor-related frequencies
+        nyquist = self.fs / 2
+        low = 8 / nyquist
+        high = 30 / nyquist
+
+        # Apply bandpass filter
+        b, a = signal.butter(4, [low, high], btype="band")
+        filtered_data = signal.filtfilt(b, a, data)
+
+        # Calculate RMS power
+        power = np.sqrt(np.mean(filtered_data**2))
+
+        return float(power)
 
 
 class BCIEngine:

@@ -8,6 +8,7 @@ from typing import Optional
 from airobo_trainer.models.item_model import ItemModel
 from airobo_trainer.views.main_view import MainView
 from airobo_trainer.views.bci_config_view import BCIConfigView
+from airobo_trainer.views.experiment_config_view import ExperimentConfigView
 from airobo_trainer.views.experiment_views import (
     TextCommandsExperimentView,
     AvatarExperimentView,
@@ -34,6 +35,7 @@ class MainController:
         self.model = model if model is not None else ItemModel()
         self.main_view = view if view is not None else MainView()
         self.bci_config_view = BCIConfigView()
+        self.experiment_config_view = ExperimentConfigView()
         self.current_experiment_view = None  # Track current experiment view
         self.current_view = self.main_view  # Track which view is currently active
 
@@ -46,8 +48,10 @@ class MainController:
     def _connect_signals(self) -> None:
         """Connect view signals to controller handler methods."""
         self.main_view.configure_bci_requested.connect(self._show_bci_config)
+        self.main_view.configure_experiment_requested.connect(self._show_experiment_config)
         self.main_view.experiment_selected.connect(self._show_experiment)
         self.bci_config_view.back_requested.connect(self._show_main_view)
+        self.experiment_config_view.back_requested.connect(self._show_main_view)
 
     def _update_view(self) -> None:
         """Update the main view with current model data."""
@@ -73,10 +77,17 @@ class MainController:
         self.bci_config_view.show()
         self.current_view = self.bci_config_view
 
+    def _show_experiment_config(self) -> None:
+        """Show the experiment configuration view."""
+        self.main_view.hide()
+        self.experiment_config_view.show()
+        self.current_view = self.experiment_config_view
+
     def _show_main_view(self) -> None:
         """Show the main view."""
         # Hide any current views
         self.bci_config_view.hide()
+        self.experiment_config_view.hide()
         if self.current_experiment_view:
             self.current_experiment_view.hide()
 
@@ -93,11 +104,11 @@ class MainController:
 
         # Create the appropriate experiment view
         if experiment_name == "Text Commands":
-            self.current_experiment_view = TextCommandsExperimentView(experiment_name, bci_config)
+            self.current_experiment_view = TextCommandsExperimentView(experiment_name, bci_config, self.experiment_config_view)
         elif experiment_name == "Avatar":
-            self.current_experiment_view = AvatarExperimentView(experiment_name, bci_config)
+            self.current_experiment_view = AvatarExperimentView(experiment_name, bci_config, self.experiment_config_view)
         elif experiment_name == "Video":
-            self.current_experiment_view = VideoExperimentView(experiment_name, bci_config)
+            self.current_experiment_view = VideoExperimentView(experiment_name, bci_config, self.experiment_config_view)
         else:
             return  # Unknown experiment
 

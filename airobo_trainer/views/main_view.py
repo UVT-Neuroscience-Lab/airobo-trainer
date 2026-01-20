@@ -25,6 +25,7 @@ class MainView(QMainWindow):
 
     # Custom signals for user interactions
     configure_bci_requested = pyqtSignal()
+    configure_experiment_requested = pyqtSignal()
     experiment_selected = pyqtSignal(str)
 
     def __init__(self) -> None:
@@ -69,9 +70,22 @@ class MainView(QMainWindow):
         self.configure_bci_button.clicked.connect(self._on_configure_bci_button_clicked)
         main_layout.addWidget(self.configure_bci_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        # Configure Experiment button
+        self.configure_experiment_button = QPushButton("Configure Experiment")
+        self.configure_experiment_button.clicked.connect(
+            self._on_configure_experiment_button_clicked
+        )
+        main_layout.addWidget(
+            self.configure_experiment_button, alignment=Qt.AlignmentFlag.AlignCenter
+        )
+
     def _on_configure_bci_button_clicked(self) -> None:
         """Handle configure BCI button click event."""
         self.configure_bci_requested.emit()
+
+    def _on_configure_experiment_button_clicked(self) -> None:
+        """Handle configure experiment button click event."""
+        self.configure_experiment_requested.emit()
 
     def _on_item_clicked(self, item) -> None:
         """Handle item click event."""
