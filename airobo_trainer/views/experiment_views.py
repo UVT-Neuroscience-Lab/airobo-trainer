@@ -3,6 +3,10 @@ Experiment Views - Views for different experiment types
 Follows the View component of MVC architecture
 """
 
+import os
+import csv
+import datetime
+import numpy as np
 from PyQt6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -13,10 +17,122 @@ from PyQt6.QtWidgets import (
     QFrame,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QRect, QTimer, QUrl
+from PyQt6.QtCore import Qt, pyqtSignal, QRect, QTimer, QUrl, QThread
 from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QPixmap
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
+
+from airobo_trainer.models.bci_core import BCIEngine
+
+
+class BCIWorker(QThread):
+    """BCI worker thread for recording EEG data."""
+
+    data_received = pyqtSignal(object)  # raw EEG block
+
+    def __init__(self, output_path: str, bci_config: dict = None):
+        super().__init__()
+        self.output_path = output_path
+        self.bci_config = bci_config or {}
+        self.engine = BCIEngine(config=self.bci_config)
+        self.raw_samples = []
+        self._running = False
+        self.start_time = None
+
+    def run(self):
+        """Run the BCI recording."""
+        self._running = True
+        try:
+            self.engine.connect()
+            self.start_time = datetime.datetime.now()
+            self.engine.start_streaming(self.handle_raw_block)
+            while self._running:
+                self.msleep(50)
+        except Exception as e:
+            print(f"BCI recording error: {e}")
+            self._running = False
+
+    def handle_raw_block(self, block):
+        """Handle incoming raw EEG block."""
+        if not self._running:
+            return
+        self.raw_samples.append(block)
+        self.data_received.emit(block)
+
+    def stop_recording(self):
+        """Stop recording and save data."""
+        self._running = False
+        self.engine.stop()
+        self.quit()
+        # Save CSV if data was collected
+        if self.raw_samples:
+            self._save_csv()
+
+    def _save_csv(self):
+        """Save recorded data to CSV with timestamp."""
+        try:
+            os.makedirs(self.output_path, exist_ok=True)
+            timestamp = self.start_time.strftime("%d_%m_%Y_%H_%M_%S")
+            filename = f"raw_eeg_{timestamp}.csv"
+            filepath = os.path.join(self.output_path, filename)
+
+            # Concatenate all samples
+            all_raw = np.concatenate(self.raw_samples, axis=0)
+
+            # Get selected electrode names from config
+            selected_electrodes = self.bci_config.get("selected_electrodes", set())
+            electrode_names = []
+            if selected_electrodes:
+                # Map electrode indices to names
+                ELECTRODE_NAMES = [
+                    "FP1",
+                    "FP2",
+                    "AF3",
+                    "AF4",
+                    "F7",
+                    "F3",
+                    "FZ",
+                    "F4",
+                    "F8",
+                    "FC5",
+                    "FC1",
+                    "FC2",
+                    "FC6",
+                    "T7",
+                    "C3",
+                    "CZ",
+                    "C4",
+                    "T8",
+                    "CP5",
+                    "CP1",
+                    "CP2",
+                    "CP6",
+                    "P7",
+                    "P3",
+                    "PZ",
+                    "P4",
+                    "P8",
+                    "PO7",
+                    "PO3",
+                    "PO4",
+                    "PO8",
+                    "OZ",
+                ]
+                electrode_names = [ELECTRODE_NAMES[i] for i in sorted(selected_electrodes)]
+            else:
+                # Fallback to generic names
+                electrode_names = ["ch" + str(i + 1) for i in range(all_raw.shape[1])]
+
+            with open(filepath, "w", newline="") as f:
+                writer = csv.writer(f)
+                # Header with electrode names only
+                header = electrode_names
+                writer.writerow(header)
+                writer.writerows(all_raw)
+
+            print(f"Saved BCI data to: {filepath}")
+        except Exception as e:
+            print(f"Error saving CSV: {e}")
 
 
 class MuscleBar(QFrame):
@@ -132,9 +248,10 @@ class BaseExperimentView(QMainWindow):
     # Custom signals
     back_requested = pyqtSignal()
 
-    def __init__(self, experiment_name: str):
+    def __init__(self, experiment_name: str, bci_config: dict = None):
         super().__init__()
         self.experiment_name = experiment_name
+        self.bci_config = bci_config or {"output_path": "airobo_trainer/output"}
         self.current_mode = "relax"  # "left", "right", or "relax"
         self.oscillation_timer = QTimer()
         self.oscillation_timer.timeout.connect(self._update_muscle_bars)
@@ -147,6 +264,11 @@ class BaseExperimentView(QMainWindow):
         self.current_right_levels = [0] * 6
         self.target_left_levels = [0] * 6
         self.target_right_levels = [0] * 6
+
+        # BCI recording
+        self.bci_worker = None
+        self.is_recording = False
+
         self._init_ui()
         # Start with relax oscillation
         self._start_gradual_transition("relax")
@@ -171,10 +293,30 @@ class BaseExperimentView(QMainWindow):
         # Experiment title right underneath back button
         title_label = QLabel(self.experiment_name)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet(
-            "font-size: 24px; font-weight: bold; margin: 15px 0 20px 0; color: #FFF;"
-        )
+        title_label.setStyleSheet("font-size: 24px; font-weight: bold; margin: 15px 0 10px 0;")
         main_layout.addWidget(title_label)
+
+        # Start Test button
+        self.start_test_button = QPushButton("Start Test")
+        self.start_test_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                border-radius: 8px;
+                padding: 12px 24px;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        self.start_test_button.clicked.connect(self._on_start_test_clicked)
+        main_layout.addWidget(self.start_test_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Create horizontal layout for content with edge-positioned bars
         content_layout = QHBoxLayout()
@@ -252,7 +394,78 @@ class BaseExperimentView(QMainWindow):
 
     def _on_back_button_clicked(self):
         """Handle back button click."""
+        # Stop recording if currently running
+        if self.is_recording and self.bci_worker:
+            self._stop_recording()
         self.back_requested.emit()
+
+    def _on_start_test_clicked(self):
+        """Handle start/end test button click."""
+        if self.is_recording:
+            self._stop_recording()
+        else:
+            self._start_recording()
+
+    def _start_recording(self):
+        """Start BCI recording."""
+        # Check if any electrodes are selected
+        selected_electrodes = self.bci_config.get("selected_electrodes", set())
+        if not selected_electrodes:
+            print("No electrodes selected. Please select electrodes in BCI Configuration.")
+            return
+
+        try:
+            output_path = self.bci_config.get("output_path", "airobo_trainer/output")
+            self.bci_worker = BCIWorker(output_path, self.bci_config)
+            self.bci_worker.start()
+            self.is_recording = True
+            self.start_test_button.setText("End Test")
+            self.start_test_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #F44336;
+                    color: white;
+                    font-size: 18px;
+                    font-weight: bold;
+                    border-radius: 8px;
+                    padding: 12px 24px;
+                    min-width: 150px;
+                }
+                QPushButton:hover {
+                    background-color: #D32F2F;
+                }
+                QPushButton:pressed {
+                    background-color: #B71C1C;
+                }
+            """)
+            print("BCI recording started")
+        except Exception as e:
+            print(f"Failed to start BCI recording: {e}")
+
+    def _stop_recording(self):
+        """Stop BCI recording."""
+        if self.bci_worker:
+            self.bci_worker.stop_recording()
+            self.bci_worker = None
+        self.is_recording = False
+        self.start_test_button.setText("Start Test")
+        self.start_test_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                border-radius: 8px;
+                padding: 12px 24px;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """)
+        print("BCI recording stopped")
 
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts for simulation."""
@@ -597,10 +810,10 @@ class VideoExperimentView(BaseExperimentView):
     Shows video area in the center, ready for video playback.
     """
 
-    def __init__(self, experiment_name: str):
+    def __init__(self, experiment_name: str, bci_config: dict = None):
         # Preload videos for seamless switching
         self._preload_videos()
-        super().__init__(experiment_name)
+        super().__init__(experiment_name, bci_config)
 
     def _preload_videos(self):
         """Preload video files for seamless playback switching."""
@@ -638,7 +851,7 @@ class VideoExperimentView(BaseExperimentView):
         self.video_widget = QVideoWidget()
         self.video_player.setVideoOutput(self.video_widget)
         self.video_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.video_widget.setMinimumSize(400, 500)  # Ensure minimum size
+        self.video_widget.setMinimumSize(350, 450)  # Ensure minimum size
         self.video_widget.show()  # Ensure the widget is visible
         self.video_widget.repaint()  # Force repaint
 

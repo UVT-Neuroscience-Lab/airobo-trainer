@@ -4,10 +4,13 @@ Unit tests for Experiment Views
 
 import pytest
 from pytestqt.qtbot import QtBot
+from unittest.mock import Mock, mock_open, patch
+import numpy as np
 from PyQt6.QtWidgets import QPushButton, QLabel
 from PyQt6.QtCore import Qt
 
 from airobo_trainer.views.experiment_views import (
+    BCIWorker,
     MuscleBar,
     BaseExperimentView,
     TextCommandsExperimentView,
@@ -305,3 +308,65 @@ class TestVideoExperimentView:
         # Check that paths contain expected video files
         assert "l_hand.mp4" in video_view.left_video_path
         assert "r_hand.mp4" in video_view.right_video_path
+
+
+class TestBCIWorker:
+    """Test suite for the BCIWorker class."""
+
+    @pytest.fixture
+    def bci_worker(self):
+        """Create a BCIWorker instance for testing."""
+        config = {"selected_electrodes": {14, 15, 16}, "output_path": "test/output"}  # C3, CZ, C4
+        return BCIWorker("test/output", config)
+
+    def test_init(self, bci_worker):
+        """Test BCIWorker initialization."""
+        assert bci_worker.output_path == "test/output"
+        assert bci_worker.bci_config["selected_electrodes"] == {14, 15, 16}
+        assert bci_worker._running is False
+        assert bci_worker.raw_samples == []
+        assert bci_worker.start_time is None
+
+    @patch("airobo_trainer.models.bci_core.BCIEngine")
+    def test_run_and_stop(self, mock_engine_class, bci_worker):
+        """Test running and stopping the BCI worker."""
+        mock_engine = Mock()
+        mock_engine_class.return_value = mock_engine
+
+        # Start the worker
+        bci_worker._running = True
+        bci_worker.start_time = Mock()
+
+        # Test handle_raw_block
+        test_block = np.array([[1, 2, 3], [4, 5, 6]])
+        bci_worker.handle_raw_block(test_block)
+        assert len(bci_worker.raw_samples) == 1
+
+        # Test stop recording
+        with patch("os.makedirs"), patch("builtins.open", mock_open()), patch(
+            "csv.writer"
+        ):
+            bci_worker.stop_recording()
+            assert bci_worker._running is False
+
+    @patch("os.makedirs")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("csv.writer")
+    def test_save_csv(self, mock_csv_writer, mock_file, mock_makedirs, bci_worker):
+        """Test CSV saving functionality."""
+        # Add some test data
+        bci_worker.raw_samples = [
+            np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]),
+            np.array([[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]]),
+        ]
+        bci_worker.start_time = Mock()
+        bci_worker.start_time.strftime.return_value = "test_timestamp"
+
+        bci_worker._save_csv()
+
+        # Verify CSV was written with correct headers and data
+        mock_csv_writer.assert_called_once()
+        writer_instance = mock_csv_writer.return_value
+        # Should write header first, then all data rows
+        assert writer_instance.writerow.call_count == 1  # Header
+        assert writer_instance.writerows.call_count == 1  # All data rows

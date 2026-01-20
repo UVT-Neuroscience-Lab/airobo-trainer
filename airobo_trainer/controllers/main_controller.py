@@ -87,13 +87,17 @@ class MainController:
 
     def _show_experiment(self, experiment_name: str) -> None:
         """Show the experiment view for the selected experiment."""
+        # Get BCI configuration
+        bci_config = self.bci_config_view.get_bci_parameters()
+        bci_config["selected_electrodes"] = self.bci_config_view.get_selected_electrodes()
+
         # Create the appropriate experiment view
         if experiment_name == "Text Commands":
-            self.current_experiment_view = TextCommandsExperimentView(experiment_name)
+            self.current_experiment_view = TextCommandsExperimentView(experiment_name, bci_config)
         elif experiment_name == "Avatar":
-            self.current_experiment_view = AvatarExperimentView(experiment_name)
+            self.current_experiment_view = AvatarExperimentView(experiment_name, bci_config)
         elif experiment_name == "Video":
-            self.current_experiment_view = VideoExperimentView(experiment_name)
+            self.current_experiment_view = VideoExperimentView(experiment_name, bci_config)
         else:
             return  # Unknown experiment
 

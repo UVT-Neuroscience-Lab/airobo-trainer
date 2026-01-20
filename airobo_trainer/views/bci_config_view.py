@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QGroupBox,
     QFrame,
+    QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPainter, QBrush, QColor, QPen, QPixmap
@@ -211,6 +212,7 @@ class BCIConfigView(QMainWindow):
     def __init__(self):
         super().__init__()
         self._init_ui()
+        self._set_default_electrodes()
 
     def _init_ui(self):
         """Set up the BCI configuration interface."""
@@ -227,6 +229,17 @@ class BCIConfigView(QMainWindow):
         back_button.clicked.connect(self._on_back_button_clicked)
         main_layout.addWidget(back_button)
 
+        # Output Configuration section
+        output_group = QGroupBox("Output Configuration")
+        output_layout = QVBoxLayout(output_group)
+
+        # Output folder path
+        self.output_path_edit = QLineEdit("airobo_trainer/output")
+        output_layout.addWidget(QLabel("Output Folder Path:"))
+        output_layout.addWidget(self.output_path_edit)
+
+        main_layout.addWidget(output_group)
+
         # BCI Parameters section
         params_group = QGroupBox("BCI Parameters")
         params_layout = QVBoxLayout(params_group)
@@ -234,42 +247,25 @@ class BCIConfigView(QMainWindow):
         # Sampling rate
         self.sampling_rate_combo = QComboBox()
         self.sampling_rate_combo.addItems(["250 Hz", "500 Hz"])
+        self.sampling_rate_combo.setCurrentText("500 Hz")  # Default to 500 Hz
+        self.sampling_rate_combo.currentTextChanged.connect(self._on_sampling_rate_changed)
         params_layout.addWidget(QLabel("Sampling Rate:"))
         params_layout.addWidget(self.sampling_rate_combo)
 
         # Bandpass filter dropdown
         self.bandpass_combo = QComboBox()
-        self.bandpass_combo.addItems(
-            [
-                "0.1 – 30 Hz Bandpass",
-                "0.1 – 50 Hz Bandpass",
-                "0.5 – 30 Hz Bandpass",
-                "0.5 – 50 Hz Bandpass",
-                "1 – 30 Hz Bandpass",
-                "1 – 50 Hz Bandpass",
-                "2 – 30 Hz Bandpass",
-                "2 – 50 Hz Bandpass",
-                "0.1 Hz Highpass",
-                "0.5 Hz Highpass",
-                "1 Hz Highpass",
-                "2 Hz Highpass",
-                "20 Hz Lowpass",
-                "50 Hz Lowpass",
-                "None - No filter applied",
-            ]
-        )
         params_layout.addWidget(QLabel("Bandpass Filter:"))
         params_layout.addWidget(self.bandpass_combo)
 
         # Notch filter dropdown
         self.notch_combo = QComboBox()
-        self.notch_combo.addItems(
-            ["None", "50Hz", "60Hz", "50Hz + 60Hz", "50Hz (Cascading)", "60Hz (Cascading)"]
-        )
         params_layout.addWidget(QLabel("Notch Filter:"))
         params_layout.addWidget(self.notch_combo)
 
         main_layout.addWidget(params_group)
+
+        # Initialize filter options based on default sampling rate
+        self._update_filter_options()
 
         # Electrode Selection section
         electrode_group = QGroupBox("Electrode Selection")
@@ -296,6 +292,92 @@ class BCIConfigView(QMainWindow):
         selected_count = len(self.electrode_widget.selected_electrodes)
         self.status_label.setText(f"Selected {selected_count} electrodes")
 
+    def _on_sampling_rate_changed(self):
+        """Handle sampling rate change."""
+        self._update_filter_options()
+
+    def _update_filter_options(self):
+        """Update filter options based on selected sampling rate."""
+        sampling_rate = self.sampling_rate_combo.currentText()
+
+        # Based on the actual device filters queried, these are the available options
+        if sampling_rate == "250 Hz":
+            bandpass_filters = [
+                "0.1 – 30 Hz Bandpass",
+                "0.1 – 60 Hz Bandpass",
+                "0.5 – 30 Hz Bandpass",
+                "0.5 – 60 Hz Bandpass",
+                "2.0 – 30 Hz Bandpass",
+                "2.0 – 60 Hz Bandpass",
+                "5.0 – 30 Hz Bandpass",
+                "5.0 – 60 Hz Bandpass",
+                "0.1 Hz Highpass",
+                "1.0 Hz Highpass",
+                "2.0 Hz Highpass",
+                "5.0 Hz Highpass",
+                "30 Hz Lowpass",
+                "60 Hz Lowpass",
+                "100 Hz Lowpass",
+                "None - No filter applied",
+            ]
+        else:  # 500 Hz
+            bandpass_filters = [
+                "0.1 – 30 Hz Bandpass",
+                "0.1 – 60 Hz Bandpass",
+                "0.1 – 100 Hz Bandpass",
+                "0.1 – 200 Hz Bandpass",
+                "0.5 – 30 Hz Bandpass",
+                "0.5 – 60 Hz Bandpass",
+                "0.5 – 100 Hz Bandpass",
+                "0.5 – 200 Hz Bandpass",
+                "2.0 – 30 Hz Bandpass",
+                "2.0 – 60 Hz Bandpass",
+                "2.0 – 100 Hz Bandpass",
+                "2.0 – 200 Hz Bandpass",
+                "5.0 – 30 Hz Bandpass",
+                "5.0 – 60 Hz Bandpass",
+                "5.0 – 100 Hz Bandpass",
+                "5.0 – 200 Hz Bandpass",
+                "0.1 Hz Highpass",
+                "1.0 Hz Highpass",
+                "2.0 Hz Highpass",
+                "5.0 Hz Highpass",
+                "30 Hz Lowpass",
+                "60 Hz Lowpass",
+                "100 Hz Lowpass",
+                "200 Hz Lowpass",
+                "None - No filter applied",
+            ]
+
+        # Update bandpass filter options
+        current_bandpass = self.bandpass_combo.currentText()
+        self.bandpass_combo.clear()
+        self.bandpass_combo.addItems(bandpass_filters)
+
+        # Try to restore previous selection if it's still valid
+        if current_bandpass in bandpass_filters:
+            self.bandpass_combo.setCurrentText(current_bandpass)
+        else:
+            # Default to "0.1 – 60 Hz Bandpass" (user preference)
+            default_option = "0.1 – 60 Hz Bandpass"
+            if default_option in bandpass_filters:
+                self.bandpass_combo.setCurrentText(default_option)
+            else:
+                self.bandpass_combo.setCurrentIndex(0)
+
+        # Notch filters are the same for both sampling rates
+        notch_filters = ["None", "50Hz", "60Hz"]
+        current_notch = self.notch_combo.currentText()
+        self.notch_combo.clear()
+        self.notch_combo.addItems(notch_filters)
+
+        # Restore notch filter selection if valid
+        if current_notch in notch_filters:
+            self.notch_combo.setCurrentText(current_notch)
+        else:
+            # Default to "50Hz" (user preference)
+            self.notch_combo.setCurrentText("50Hz")
+
     def get_selected_electrodes(self):
         """Get the set of selected electrode indices."""
         return self.electrode_widget.selected_electrodes.copy()
@@ -303,10 +385,21 @@ class BCIConfigView(QMainWindow):
     def get_bci_parameters(self):
         """Get current BCI parameter settings."""
         return {
+            "output_path": self.output_path_edit.text(),
             "sampling_rate": self.sampling_rate_combo.currentText(),
             "bandpass_filter": self.bandpass_combo.currentText(),
             "notch_filter": self.notch_combo.currentText(),
         }
+
+    def _set_default_electrodes(self):
+        """Set default electrodes for left/right arm movement detection."""
+        # Default electrodes for motor imagery (left/right hand movement):
+        # C3 (left motor cortex), CZ (central), C4 (right motor cortex)
+        # Indices: C3=14, CZ=15, C4=16
+        default_electrodes = {14, 15, 16}  # C3, CZ, C4
+        self.electrode_widget.selected_electrodes = default_electrodes.copy()
+        self.electrode_widget.update()
+        self._on_electrode_selected(0)  # Update status label
 
     def set_status(self, message: str):
         """Set the status label text."""
