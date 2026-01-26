@@ -23,6 +23,7 @@ from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from airobo_trainer.models.bci_core import BCIEngine, AttentionCalculator
+from airobo_trainer.models.scoring_system import ScoringSystem
 from airobo_trainer.views.experiment_config_view import ExperimentConfigView
 
 
@@ -282,6 +283,9 @@ class BaseExperimentView(QMainWindow):
         self.attention_timer = QTimer()
         self.attention_timer.timeout.connect(self._update_attention_bars)
 
+        # Scoring system for gamification
+        self.scoring_system = ScoringSystem()
+
         self._init_ui()
         # Start with relax oscillation
         self._start_gradual_transition("relax")
@@ -289,7 +293,7 @@ class BaseExperimentView(QMainWindow):
     def _init_ui(self):
         """Set up the basic experiment interface."""
         self.setWindowTitle(f"AiRobo-Trainer - {self.experiment_name}")
-        self.setMinimumSize(900, 700)
+        self.setMinimumSize(900, 900)
 
         # Create central widget and main layout
         central_widget = QWidget()
@@ -303,10 +307,27 @@ class BaseExperimentView(QMainWindow):
         back_button.setMaximumWidth(100)
         main_layout.addWidget(back_button, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # Experiment title right underneath back button
+        # Score display above experiment title (centered)
+        self.score_label = QLabel("Score: 0")
+        self.score_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.score_label.setStyleSheet("""
+            QLabel {
+                font-size: 20px;
+                font-weight: bold;
+                color: #FF6B35;
+                background-color: #FFF8E1;
+                border: 2px solid #FFB74D;
+                border-radius: 10px;
+                padding: 8px 16px;
+                margin: 5px 0;
+            }
+        """)
+        main_layout.addWidget(self.score_label, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Experiment title right underneath score
         title_label = QLabel(self.experiment_name)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold; margin: 15px 0 10px 0;")
+        title_label.setStyleSheet("font-size: 24px; font-weight: bold; margin: 10px 0 10px 0;")
         main_layout.addWidget(title_label)
 
         # Start Test button
@@ -453,6 +474,10 @@ class BaseExperimentView(QMainWindow):
                     background-color: #B71C1C;
                 }
             """)
+            # Start scoring system
+            self.scoring_system.start_experiment()
+            self.score_label.setText("Score: 0")
+
             # Start attention calculation if motor electrodes are available
             if self.has_motor_electrodes:
                 self.attention_timer.start(100)  # Update every 100ms
@@ -479,6 +504,13 @@ class BaseExperimentView(QMainWindow):
 
         # Get current attention levels
         left_attention, right_attention = self.attention_calculator.calculate_attention()
+
+        # Update scoring system with intention values
+        self.scoring_system.update_intention(left_attention, right_attention)
+
+        # Update score display
+        current_score = self.scoring_system.get_current_score()
+        self.score_label.setText(f"Score: {current_score}")
 
         # Update muscle bars based on attention levels
         # Map 0-100 attention to muscle activation levels
@@ -517,7 +549,28 @@ class BaseExperimentView(QMainWindow):
                 background-color: #3d8b40;
             }
         """)
-        print("BCI recording stopped")
+
+        # Calculate final score and handle leaderboard
+        final_score = self.scoring_system.end_experiment()
+        self.score_label.setText(f"Final Score: {final_score}")
+
+        print(f"BCI recording stopped. Final score: {final_score}")
+
+        # Check if score qualifies for leaderboard
+        if self.scoring_system.is_top_10_score(final_score):
+            from airobo_trainer.views.leaderboard_view import LeaderboardView
+            player_name = LeaderboardView.show_leaderboard_entry_dialog(final_score, self)
+            if player_name:
+                self.scoring_system.submit_score(player_name)
+                print(f"Score submitted to leaderboard: {player_name} - {final_score}")
+        else:
+            # Show final score message
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Experiment Complete",
+                f"Your final score: {final_score}\n\nKeep practicing to make it to the leaderboard!"
+            )
 
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts for simulation."""
@@ -532,6 +585,10 @@ class BaseExperimentView(QMainWindow):
 
     def set_simulation_mode(self, mode: str):
         """Set the simulation mode and update content accordingly."""
+        # Track instruction change for scoring
+        if self.is_recording:
+            self.scoring_system.change_instruction(mode)
+
         # Update content immediately
         self.current_mode = mode
 

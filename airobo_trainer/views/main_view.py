@@ -26,6 +26,7 @@ class MainView(QMainWindow):
     # Custom signals for user interactions
     configure_bci_requested = pyqtSignal()
     configure_experiment_requested = pyqtSignal()
+    leaderboard_requested = pyqtSignal()
     experiment_selected = pyqtSignal(str)
 
     def __init__(self) -> None:
@@ -79,6 +80,11 @@ class MainView(QMainWindow):
             self.configure_experiment_button, alignment=Qt.AlignmentFlag.AlignCenter
         )
 
+        # Leaderboard button
+        self.leaderboard_button = QPushButton("Leaderboard")
+        self.leaderboard_button.clicked.connect(self._on_leaderboard_button_clicked)
+        main_layout.addWidget(self.leaderboard_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
     def _on_configure_bci_button_clicked(self) -> None:
         """Handle configure BCI button click event."""
         self.configure_bci_requested.emit()
@@ -86,6 +92,10 @@ class MainView(QMainWindow):
     def _on_configure_experiment_button_clicked(self) -> None:
         """Handle configure experiment button click event."""
         self.configure_experiment_requested.emit()
+
+    def _on_leaderboard_button_clicked(self) -> None:
+        """Handle leaderboard button click event."""
+        self.leaderboard_requested.emit()
 
     def _on_item_clicked(self, item) -> None:
         """Handle item click event."""

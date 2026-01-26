@@ -9,6 +9,7 @@ from airobo_trainer.models.item_model import ItemModel
 from airobo_trainer.views.main_view import MainView
 from airobo_trainer.views.bci_config_view import BCIConfigView
 from airobo_trainer.views.experiment_config_view import ExperimentConfigView
+from airobo_trainer.views.leaderboard_view import LeaderboardView
 from airobo_trainer.views.experiment_views import (
     TextCommandsExperimentView,
     AvatarExperimentView,
@@ -36,6 +37,7 @@ class MainController:
         self.main_view = view if view is not None else MainView()
         self.bci_config_view = BCIConfigView()
         self.experiment_config_view = ExperimentConfigView()
+        self.leaderboard_view = LeaderboardView()
         self.current_experiment_view = None  # Track current experiment view
         self.current_view = self.main_view  # Track which view is currently active
 
@@ -49,9 +51,11 @@ class MainController:
         """Connect view signals to controller handler methods."""
         self.main_view.configure_bci_requested.connect(self._show_bci_config)
         self.main_view.configure_experiment_requested.connect(self._show_experiment_config)
+        self.main_view.leaderboard_requested.connect(self._show_leaderboard)
         self.main_view.experiment_selected.connect(self._show_experiment)
         self.bci_config_view.back_requested.connect(self._show_main_view)
         self.experiment_config_view.back_requested.connect(self._show_main_view)
+        self.leaderboard_view.back_requested.connect(self._show_main_view)
 
     def _update_view(self) -> None:
         """Update the main view with current model data."""
@@ -83,11 +87,20 @@ class MainController:
         self.experiment_config_view.show()
         self.current_view = self.experiment_config_view
 
+    def _show_leaderboard(self) -> None:
+        """Show the leaderboard view."""
+        # Refresh leaderboard data before showing
+        self.leaderboard_view._update_leaderboard()
+        self.main_view.hide()
+        self.leaderboard_view.show()
+        self.current_view = self.leaderboard_view
+
     def _show_main_view(self) -> None:
         """Show the main view."""
         # Hide any current views
         self.bci_config_view.hide()
         self.experiment_config_view.hide()
+        self.leaderboard_view.hide()
         if self.current_experiment_view:
             self.current_experiment_view.hide()
 
